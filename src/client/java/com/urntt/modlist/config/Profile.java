@@ -84,44 +84,32 @@ public final class Profile {
 		return this.brand;
 	}
 
-	/** Sets the custom brand and, if it changed, switches to {@link ReportMode#CUSTOM}. */
+	/** Sets the brand reported in {@link ReportMode#CUSTOM} mode. */
 	public void setBrand(final String brand) {
-		String trimmed = brand.trim();
-		if (!trimmed.equals(this.brand)) {
-			this.brand = trimmed;
-			this.reportMode = ReportMode.CUSTOM;
-			this.changed();
-		}
+		this.brand = brand.trim();
+		this.changed();
 	}
 
 	public List<String> hiddenNamespaces() {
 		return List.copyOf(this.hiddenNamespaces);
 	}
 
-	/** Sets the hidden namespaces and, if they changed, switches to {@link ReportMode#CUSTOM}. */
+	/** Sets the namespaces hidden in {@link ReportMode#CUSTOM} mode. */
 	public void setHiddenNamespaces(final List<String> hiddenNamespaces) {
-		List<String> previous = this.hiddenNamespaces;
 		this.hiddenNamespaces = new ArrayList<>(hiddenNamespaces);
 		this.normalize();
-		if (!this.hiddenNamespaces.equals(previous)) {
-			this.reportMode = ReportMode.CUSTOM;
-			this.changed();
-		}
+		this.changed();
 	}
 
 	public List<String> fakeChannels() {
 		return List.copyOf(this.fakeChannels);
 	}
 
-	/** Sets the fake channel entries and, if they changed, switches to {@link ReportMode#CUSTOM}. */
+	/** Sets the fake channel entries used in {@link ReportMode#CUSTOM} mode. */
 	public void setFakeChannels(final List<String> fakeChannels) {
-		List<String> previous = this.fakeChannels;
 		this.fakeChannels = new ArrayList<>(fakeChannels);
 		this.normalize();
-		if (!this.fakeChannels.equals(previous)) {
-			this.reportMode = ReportMode.CUSTOM;
-			this.changed();
-		}
+		this.changed();
 	}
 
 	public boolean protectHiddenTranslations() {

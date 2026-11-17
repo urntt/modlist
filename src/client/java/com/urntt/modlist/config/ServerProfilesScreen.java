@@ -20,9 +20,12 @@ import net.minecraft.network.chat.Component;
 import org.jspecify.annotations.Nullable;
 
 /**
- * Lists the server profiles. Adding one copies the default profile and opens it; editing opens it; removing deletes it
- * at once. A connection uses the first profile whose address matches, so a profile that an earlier one always matches
- * first is marked as unused.
+ * Lists the server profiles. Adding one copies the default profile into a new entry; editing opens it; removing deletes
+ * it at once. A connection uses the first profile whose address matches, so a profile that an earlier one always
+ * matches first is marked as unused.
+ *
+ * <p>Vanilla initializes a screen instance only once and merely repositions it when it is shown again, so the list is
+ * refreshed in place: after adding or removing, and in {@link #added()} when returning from a profile.
  */
 public final class ServerProfilesScreen extends Screen {
 	private static final Component TITLE = Component.translatable("options.modlist.server_profiles.title");
@@ -39,6 +42,8 @@ public final class ServerProfilesScreen extends Screen {
 	private @Nullable ProfileList profileList;
 	private @Nullable EditBox addressBox;
 	private @Nullable Button addButton;
+	/** Set when a row asks to refresh the list while the list is handling that row's click. */
+	private boolean pendingRefresh;
 
 	public ServerProfilesScreen(final Screen parent, final ModListConfig config) {
 		super(TITLE);
@@ -51,7 +56,8 @@ public final class ServerProfilesScreen extends Screen {
 	protected void init() {
 		ScreenWidgets.addHeader(this.layout, TITLE, DESCRIPTION, this.font);
 
-		this.profileList = this.layout.addToContents(new ProfileList(this.config.serverProfiles()));
+		this.profileList = this.layout.addToContents(new ProfileList());
+		this.profileList.refresh();
 
 		LinearLayout footer = this.layout.addToFooter(LinearLayout.horizontal().spacing(8));
 		this.addressBox = footer.addChild(new EditBox(this.font, 150, 20,
@@ -78,6 +84,22 @@ public final class ServerProfilesScreen extends Screen {
 	}
 
 	@Override
+	public void added() {
+		// Called whenever this screen is shown, including on return from a profile whose address may have changed.
+		if (this.profileList != null) {
+			this.profileList.refresh();
+		}
+	}
+
+	@Override
+	public void tick() {
+		if (this.pendingRefresh && this.profileList != null) {
+			this.pendingRefresh = false;
+			this.profileList.refresh();
+		}
+	}
+
+	@Override
 	public void onClose() {
 		this.minecraft.gui.setScreen(this.parent);
 	}
@@ -92,9 +114,11 @@ public final class ServerProfilesScreen extends Screen {
 	}
 
 	private void addProfile() {
-		if (this.addressBox != null && ServerAddresses.isValid(this.addressBox.getValue())) {
-			ServerProfile server = this.config.addServerProfile(this.addressBox.getValue());
-			this.minecraft.gui.setScreen(new ProfileScreen(this, server.profile(), server));
+		if (this.addressBox != null && this.profileList != null && ServerAddresses.isValid(this.addressBox.getValue())) {
+			this.config.addServerProfile(this.addressBox.getValue());
+			this.addressBox.setValue("");
+			this.profileList.refresh();
+			this.profileList.scrollToLast();
 		}
 	}
 
@@ -110,12 +134,27 @@ public final class ServerProfilesScreen extends Screen {
 	}
 
 	private final class ProfileList extends ContainerObjectSelectionList<Row> {
-		private ProfileList(final List<ServerProfile> profiles) {
+		private ProfileList() {
 			super(Minecraft.getInstance(), ServerProfilesScreen.this.width,
 					ServerProfilesScreen.this.layout.getContentHeight(), ServerProfilesScreen.this.layout.getHeaderHeight(),
 					ROW_HEIGHT);
+		}
+
+		/** Replaces the rows with the configuration's current server profiles, keeping the scroll position. */
+		private void refresh() {
+			double scroll = this.scrollAmount();
+			this.setFocused(null);
+			this.clearEntries();
+			List<ServerProfile> profiles = ServerProfilesScreen.this.config.serverProfiles();
 			for (int i = 0; i < profiles.size(); i++) {
 				this.addEntry(new Row(profiles.get(i), isShadowed(profiles, i)));
+			}
+			this.setScrollAmount(scroll);
+		}
+
+		private void scrollToLast() {
+			if (!this.children().isEmpty()) {
+				this.scrollToEntry(this.children().getLast());
 			}
 		}
 
@@ -143,7 +182,8 @@ public final class ServerProfilesScreen extends Screen {
 					.width(BUTTON_WIDTH).build();
 			this.removeButton = Button.builder(Component.translatable("options.modlist.list.remove"), button -> {
 				ServerProfilesScreen.this.config.removeServerProfile(server);
-				ServerProfilesScreen.this.rebuildWidgets();
+				// The list is still handling this row's click, so it is refreshed on the next tick.
+				ServerProfilesScreen.this.pendingRefresh = true;
 			}).width(BUTTON_WIDTH).build();
 		}
 

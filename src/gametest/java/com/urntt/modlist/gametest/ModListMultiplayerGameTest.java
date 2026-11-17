@@ -89,6 +89,7 @@ public final class ModListMultiplayerGameTest implements FabricClientGameTest {
 			Profile profile = config.addServerProfile(ADDRESS).profile();
 			profile.setIgnoreUnknownRegistryEntries(true);
 			profile.setPlaceholders(Map.of("minecraft:block", "minecraft:barrier", "minecraft:item", "minecraft:barrier"));
+			profile.setReportMode(ReportMode.CUSTOM);
 			profile.setBrand(CUSTOM_BRAND);
 			profile.setHiddenNamespaces(List.of(TestPayloads.NAMESPACE));
 			profile.setFakeChannels(List.of(TestPayloads.SERVER_NAMESPACE, FAKE_HANDSHAKE.toString()));

@@ -3,21 +3,13 @@ package com.urntt.modlist.gametest;
 import static com.urntt.modlist.gametest.GameTestSupport.LOGGER;
 import static com.urntt.modlist.gametest.GameTestSupport.check;
 import static com.urntt.modlist.gametest.GameTestSupport.checkEquals;
-import static com.urntt.modlist.gametest.GameTestSupport.configure;
 import static com.urntt.modlist.gametest.GameTestSupport.resetConfig;
-import static com.urntt.modlist.gametest.GameTestSupport.switchLanguage;
 
 import com.urntt.modlist.ModListClient;
-import com.urntt.modlist.config.HiddenModsScreen;
 import com.urntt.modlist.config.ModListConfig;
-import com.urntt.modlist.config.ModListConfigScreen;
-import com.urntt.modlist.config.PlaceholdersScreen;
 import com.urntt.modlist.config.Profile;
-import com.urntt.modlist.config.ProfileScreen;
 import com.urntt.modlist.config.ReportMode;
 import com.urntt.modlist.config.ServerProfile;
-import com.urntt.modlist.config.ServerProfilesScreen;
-import com.urntt.modlist.config.StringListScreen;
 import com.urntt.modlist.probe.HiddenTranslations;
 import com.urntt.modlist.probe.ProbeSafeText;
 import com.urntt.modlist.registry.Placeholders;
@@ -37,12 +29,10 @@ import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Map;
 import java.util.Set;
-import java.util.function.Supplier;
 import net.fabricmc.fabric.api.client.gametest.v1.FabricClientGameTest;
 import net.fabricmc.fabric.api.client.gametest.v1.context.ClientGameTestContext;
 import net.fabricmc.fabric.api.event.registry.RegistryAttribute;
 import net.fabricmc.loader.api.FabricLoader;
-import net.minecraft.client.gui.screens.Screen;
 import net.minecraft.core.Holder;
 import net.minecraft.core.registries.BuiltInRegistries;
 import net.minecraft.core.registries.Registries;
@@ -53,8 +43,7 @@ import net.minecraft.world.level.block.Blocks;
 import org.jspecify.annotations.Nullable;
 
 /**
- * Checks the configuration and the decisions about what to report and what to drop, without a world, and takes
- * screenshots of the configuration screens in both languages.
+ * Checks the configuration and the decisions about what to report and what to drop, without a world.
  */
 @SuppressWarnings("UnstableApiUsage")
 public final class ModListLogicGameTest implements FabricClientGameTest {
@@ -76,7 +65,6 @@ public final class ModListLogicGameTest implements FabricClientGameTest {
 			checkProbeSafeText();
 			checkJoinNotices();
 		});
-		checkScreens(context);
 		resetConfig(context);
 	}
 
@@ -106,8 +94,8 @@ public final class ModListLogicGameTest implements FabricClientGameTest {
 		ServerProfile server = config.addServerProfile("MC.Example.com");
 		checkEquals(ReportMode.VANILLA, server.profile().reportMode(), "a new server profile copies the default report mode");
 		check(server.profile().ignoreUnknownRegistryEntries(), "a new server profile copies the default registry option");
+		server.profile().setReportMode(ReportMode.CUSTOM);
 		server.profile().setBrand(" lunarclient ");
-		checkEquals(ReportMode.CUSTOM, server.profile().reportMode(), "editing the brand selects custom mode");
 		server.profile().setPlaceholders(Map.of("minecraft:block", "minecraft:barrier"));
 		config.defaultProfile().setReportMode(ReportMode.SERVER);
 		checkEquals(ReportMode.CUSTOM, server.profile().reportMode(), "server profiles are independent of the default profile");
@@ -200,9 +188,12 @@ public final class ModListLogicGameTest implements FabricClientGameTest {
 
 		profile.setReportMode(ReportMode.ACTUAL);
 		profile.setHiddenNamespaces(List.of("xaero"));
-		checkEquals(ReportMode.CUSTOM, profile.reportMode(), "editing hidden namespaces selects custom mode");
 		profile.setFakeChannels(List.of("mirrored", FAKE_HANDSHAKE.toString()));
 		profile.setBrand("custom");
+		checkEquals(ReportMode.ACTUAL, profile.reportMode(), "custom settings do not change the report mode");
+		check(ReportPlan.of(profile).brand() == null && !ReportPlan.of(profile).isHidden("xaero", server),
+				"custom settings only apply in custom mode");
+		profile.setReportMode(ReportMode.CUSTOM);
 		ReportPlan custom = ReportPlan.of(profile);
 		checkEquals("custom", custom.brand(), "custom brand");
 		check(custom.isHidden("xaero", server) && !custom.isHidden("fabric", server), "custom mode hides its list");
@@ -211,13 +202,13 @@ public final class ModListLogicGameTest implements FabricClientGameTest {
 		profile.setReportMode(ReportMode.VANILLA);
 		profile.setReportMode(ReportMode.ACTUAL);
 		checkEquals(List.of("xaero"), profile.hiddenNamespaces(), "switching modes keeps the custom lists");
-		profile.setBrand("custom");
-		checkEquals(ReportMode.ACTUAL, profile.reportMode(), "setting the same brand again keeps the mode");
+		checkEquals("custom", profile.brand(), "switching modes keeps the custom brand");
 		LOGGER.info("Report plans checked");
 	}
 
 	private static void checkChannelRewriter() {
 		Profile profile = ModListConfig.load(tempConfig("rewriter", null)).defaultProfile();
+		profile.setReportMode(ReportMode.CUSTOM);
 		profile.setHiddenNamespaces(List.of("xaero"));
 		profile.setFakeChannels(List.of("mirrored"));
 		List<Identifier> channels = List.of(id("fabric", "registry/sync"), id("xaero", "a"), id("xaero", "b"), id("other", "c"));
@@ -310,57 +301,6 @@ public final class ModListLogicGameTest implements FabricClientGameTest {
 		LOGGER.info("Join notice differences checked");
 	}
 
-	private static void checkScreens(final ClientGameTestContext context) {
-		configure(context, config -> {
-			Profile profile = config.defaultProfile();
-			profile.setIgnoreUnknownRegistryEntries(true);
-			profile.setPlaceholders(Map.of("minecraft:block", "minecraft:barrier"));
-			ServerProfile server = config.addServerProfile("mc.example.com");
-			server.profile().setHiddenNamespaces(List.of(TestPayloads.NAMESPACE));
-			server.profile().setFakeChannels(List.of("mirrored", FAKE_HANDSHAKE.toString()));
-			config.addServerProfile("mc.example.com:25566");
-		});
-		// Keep the cursor away from the widgets so no tooltip covers them.
-		context.getInput().setCursorPos(0, 0);
-		takeScreenshots(context, "en_us");
-		switchLanguage(context, "zh_cn");
-		takeScreenshots(context, "zh_cn");
-		switchLanguage(context, "en_us");
-	}
-
-	private static void takeScreenshots(final ClientGameTestContext context, final String language) {
-		ModListConfig config = context.computeOnClient(client -> ModListClient.config());
-		ServerProfile server = config.serverProfiles().getFirst();
-
-		screenshot(context, "main-" + language, () -> new ModListConfigScreen(null));
-		screenshot(context, "default-profile-" + language, () -> new ProfileScreen(new ModListConfigScreen(null),
-				config.defaultProfile(), null));
-		context.getInput().scroll(-20);
-		context.waitTick();
-		context.takeScreenshot("modlist-default-profile-bottom-" + language);
-		screenshot(context, "server-profile-" + language, () -> new ProfileScreen(new ModListConfigScreen(null),
-				server.profile(), server));
-		screenshot(context, "server-profiles-" + language, () -> new ServerProfilesScreen(new ModListConfigScreen(null), config));
-		screenshot(context, "placeholders-" + language, () -> new PlaceholdersScreen(new ModListConfigScreen(null),
-				config.defaultProfile()));
-		screenshot(context, "hidden-mods-" + language, () -> new HiddenModsScreen(new ModListConfigScreen(null),
-				server.profile()));
-		screenshot(context, "fake-mods-" + language, () -> new StringListScreen(new ModListConfigScreen(null),
-				Component.translatable("options.modlist.fake_mods.title"),
-				Component.translatable("options.modlist.fake_mods.description"),
-				Component.translatable("options.modlist.fake_mods.hint"),
-				Component.translatable("options.modlist.fake_mods.entry"),
-				List.of("mirrored", FAKE_HANDSHAKE.toString(), "bad entry"), ChannelEntries::isValidFakeEntry, entries -> {
-				}));
-		context.setScreen(() -> null);
-	}
-
-	private static void screenshot(final ClientGameTestContext context, final String name,
-			final Supplier<Screen> screen) {
-		context.setScreen(screen::get);
-		context.takeScreenshot("modlist-" + name);
-	}
-
 	private static Path tempConfig(final String name, final @Nullable String content) {
 		Path path = FabricLoader.getInstance().getConfigDir().resolve("modlist-test-" + name + ".json");
 		try {
@@ -384,7 +324,7 @@ public final class ModListLogicGameTest implements FabricClientGameTest {
 
 	private static Object2IntMap<Identifier> ids(final Map<Identifier, Integer> entries) {
 		Object2IntMap<Identifier> map = new Object2IntLinkedOpenHashMap<>();
-		entries.entrySet().stream().sorted(Map.Entry.comparingByValue()).forEach(entry -> map.put(entry.getKey(), entry.getValue()));
+		entries.entrySet().stream().sorted(Map.Entry.comparingByValue()).forEach(entry -> map.put(entry.getKey(), entry.getValue().intValue()));
 		return map;
 	}
 

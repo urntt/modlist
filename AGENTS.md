@@ -43,12 +43,12 @@ The mod version itself follows [Semantic Versioning](https://semver.org/); the `
 - Client-only: `fabric.mod.json` declares `"environment": "client"`. There is no server-side component. The mod only changes what the client sends and how it handles what it receives.
 - The mod never changes anything in singleplayer or on a world this client hosts (memory connections). Server list pings are not affected either; only game connections that go through the login phase are.
 - Settings are grouped in profiles. There is one default profile and any number of server profiles, each with an address. A connection uses the first server profile whose address matches (same rules as nojumpdelay: case-insensitive, an address without a port matches any port) and otherwise the default profile. A new server profile starts as a copy of the default profile; profiles do not inherit from each other afterwards. Do not reintroduce whitelist or blacklist modes.
-- A profile's report mode decides what the client reports:
-  - `actual` (default, the "Restore Current" button): the real brand and channels.
+- A profile's report mode, a single option on the profile screen, decides what the client reports:
+  - `actual` ("Unchanged", the default): the real brand and channels.
   - `vanilla` ("Mimic Vanilla"): brand `vanilla`, every namespace hidden, empty channel registrations not sent, all login queries answered as not understood, and outgoing mod payloads dropped.
   - `server` ("Mimic Server"): real brand, every channel the server announced is faked, and local namespaces the server did not announce are hidden.
-  - `custom`: the profile's own brand, hidden namespaces and faked channels. Editing any of these switches the profile to `custom`; switching modes never clears them.
-  The one-click buttons only change the report mode, never the registry options.
+  - `custom`: the profile's own brand, hidden namespaces and faked channels. These settings are only shown in custom mode; switching modes never clears them, and editing them never changes the mode.
+  The report mode never changes the registry options. Translation probing protection is shown for every mode except `actual`, where nothing is hidden.
 - Mods are hidden by channel namespace, because that is what servers see. The `minecraft` namespace cannot be hidden. A fake channel entry is either a namespace (mirror every channel the server announces in it) or a full channel ID.
 - Ignoring unknown registry entries is disabled by default. When enabled, unknown entries and registries are dropped from Fabric API's registry sync, the resulting raw ID holes are filled with the profile's placeholders (block `minecraft:air`, item `minecraft:air`, entity type `minecraft:marker` by default; other registries use their default or lowest-ID entry), unknown block state IDs resolve to the block placeholder's default state, and incompatible entity data values are skipped. When disabled, Fabric API's disconnect message gets a hint pointing to this option.
 - Join notices (enabled by default) are chat messages after joining that list ignored registry entries and the namespaces only one side has. They are informational and never block joining.
@@ -74,10 +74,11 @@ The mod version itself follows [Semantic Versioning](https://semver.org/); the `
 - Source sets: `src/main` holds only `fabric.mod.json`. All code and client resources live in `src/client`, and the client game tests live in `src/gametest`.
 - Mixins: prefer the MixinExtras injectors bundled with Fabric Loader (for example `@ModifyExpressionValue`, `@WrapOperation` and `@WrapMethod`) over `@Redirect` and `@Overwrite`, to stay compatible with other mods and keep porting work small. Name handler methods `modlist$<what>`.
 - Keep the decisions about what to report (`ReportPlan`, `ChannelRewriter`) and what to drop from registry sync (`RegistrySyncFilter`) in plain classes without Minecraft state, so the logic game test can check them directly.
+- Screens: vanilla runs `init()` only the first time a screen instance is shown and merely repositions it afterwards, and `rebuildWidgets()` runs `init()` again into the same `final` layout, which stacks a second copy of every widget. So refresh lists in place, and in `added()` when a screen is shown again; never call `rebuildWidgets()`. Option screens extend `ModListOptionsScreen`: use `section(...)` for titles (vanilla's `addHeader` titles take focus and show a border when clicked) and `refreshOptions()` to rebuild options that depend on another option, deferred to `tick()` when triggered from a click inside the list.
 
 ### Testing
 
-- The client game tests in `src/gametest` start Minecraft and check the configuration, the profile selection, the report modes, the channel rewriting, the registry filtering and placeholders, and translation probing protection, including on a local dedicated server that runs in the same JVM. Keep them passing and extend them when behavior changes.
+- The client game tests in `src/gametest` start Minecraft and check the configuration, the profile selection, the report modes, the channel rewriting, the registry filtering and placeholders, translation probing protection, and the behavior of the configuration screens, including on a local dedicated server that runs in the same JVM. Keep them passing and extend them when behavior changes.
 - After porting to a new Minecraft or Fabric API version, run the client game tests. A successful build does not prove that the mixins still have the intended effect.
 - `README.md` describes how to run them, including on a headless machine.
 

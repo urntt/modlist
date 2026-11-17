@@ -2,45 +2,39 @@ package com.urntt.modlist.config;
 
 import com.urntt.modlist.ServerAddresses;
 import com.urntt.modlist.session.ChannelEntries;
+import java.util.List;
 import java.util.function.Consumer;
-import net.minecraft.client.Minecraft;
 import net.minecraft.client.OptionInstance;
-import net.minecraft.client.gui.components.Button;
 import net.minecraft.client.gui.components.EditBox;
 import net.minecraft.client.gui.components.StringWidget;
 import net.minecraft.client.gui.components.Tooltip;
 import net.minecraft.client.gui.screens.Screen;
-import net.minecraft.client.gui.screens.options.OptionsSubScreen;
 import net.minecraft.network.chat.Component;
 import org.jspecify.annotations.Nullable;
 
 /**
  * Edits one profile: the default profile, or a server profile together with its address. Every change is saved
- * immediately.
+ * immediately. The custom report settings are only shown in custom mode, and translation protection only when the
+ * report mode hides something.
  */
-public final class ProfileScreen extends OptionsSubScreen {
+public final class ProfileScreen extends ModListOptionsScreen {
 	/** Longest address the address box accepts; long enough for any host name with a port. */
 	private static final int MAX_ADDRESS_LENGTH = 261;
 	/** Longest brand the brand box accepts. */
 	private static final int MAX_BRAND_LENGTH = 128;
+	/** Width of one of the two widgets in a row, as in vanilla's option lists. */
+	private static final int HALF_WIDTH = 150;
 
 	private final Profile profile;
 	private final @Nullable ServerProfile server;
-	private @Nullable StringWidget modeStatus;
-	private @Nullable Button mimicVanilla;
-	private @Nullable Button mimicServer;
-	private @Nullable Button restoreCurrent;
+	/** Set when the report mode changed, so the options are rebuilt on the next tick, outside the click handling. */
+	private boolean pendingRefresh;
 
 	public ProfileScreen(final Screen parent, final Profile profile, final @Nullable ServerProfile server) {
-		super(parent, Minecraft.getInstance().options, title(server));
+		super(parent, Component.translatable(server == null
+				? "options.modlist.profile.default_title" : "options.modlist.profile.server_title"));
 		this.profile = profile;
 		this.server = server;
-	}
-
-	private static Component title(final @Nullable ServerProfile server) {
-		return server == null
-				? Component.translatable("options.modlist.profile.default_title")
-				: Component.translatable("options.modlist.profile.server_title");
 	}
 
 	@Override
@@ -50,43 +44,55 @@ public final class ProfileScreen extends OptionsSubScreen {
 		}
 
 		if (this.server != null) {
-			this.list.addHeader(Component.translatable("options.modlist.section.server"));
+			this.section(Component.translatable("options.modlist.section.server"));
 			this.list.addBig(this.addressBox(this.server));
 		}
 
-		this.list.addHeader(Component.translatable("options.modlist.section.joining"));
+		this.section(Component.translatable("options.modlist.section.joining"));
 		this.list.addBig(toggle("options.modlist.ignore_unknown_registry_entries",
 				this.profile.ignoreUnknownRegistryEntries(), this.profile::setIgnoreUnknownRegistryEntries));
 		this.list.addBig(ScreenWidgets.button("options.modlist.placeholders",
 				() -> this.minecraft.gui.setScreen(new PlaceholdersScreen(this, this.profile))));
 
-		this.list.addHeader(Component.translatable("options.modlist.section.reporting"));
-		this.modeStatus = new StringWidget(Component.empty(), this.font);
-		this.list.addBig(this.modeStatus);
-		this.mimicVanilla = ScreenWidgets.button("options.modlist.mimic_vanilla",
-				() -> this.setReportMode(ReportMode.VANILLA));
-		this.mimicServer = ScreenWidgets.button("options.modlist.mimic_server",
-				() -> this.setReportMode(ReportMode.SERVER));
-		this.list.addSmall(this.mimicVanilla, this.mimicServer);
-		this.restoreCurrent = ScreenWidgets.button("options.modlist.restore_current",
-				() -> this.setReportMode(ReportMode.ACTUAL));
-		this.list.addBig(this.restoreCurrent);
-		this.list.addBig(toggle("options.modlist.protect_hidden_translations",
-				this.profile.protectHiddenTranslations(), this.profile::setProtectHiddenTranslations));
+		this.section(Component.translatable("options.modlist.section.reporting"));
+		this.list.addBig(new OptionInstance<>(
+				"options.modlist.report_mode",
+				mode -> Tooltip.create(mode.description()),
+				// The button itself prepends the caption, so this only names the value.
+				(caption, mode) -> mode.label(),
+				new OptionInstance.Enum<>(List.of(ReportMode.values()), ReportMode.CODEC),
+				this.profile.reportMode(),
+				mode -> {
+					this.profile.setReportMode(mode);
+					this.pendingRefresh = true;
+				}));
 
-		this.list.addHeader(Component.translatable("options.modlist.section.custom"));
-		this.list.addBig(this.brandBox());
-		this.list.addBig(ScreenWidgets.button("options.modlist.hidden_mods",
-				() -> this.minecraft.gui.setScreen(new HiddenModsScreen(this, this.profile))));
-		this.list.addBig(ScreenWidgets.button("options.modlist.fake_mods",
-				() -> this.minecraft.gui.setScreen(new StringListScreen(this,
-						Component.translatable("options.modlist.fake_mods.title"),
-						Component.translatable("options.modlist.fake_mods.description"),
-						Component.translatable("options.modlist.fake_mods.hint"),
-						Component.translatable("options.modlist.fake_mods.entry"),
-						this.profile.fakeChannels(), ChannelEntries::isValidFakeEntry, this.profile::setFakeChannels))));
+		ReportMode mode = this.profile.reportMode();
+		if (mode == ReportMode.CUSTOM) {
+			this.list.addSmall(new StringWidget(HALF_WIDTH, 20, Component.translatable("options.modlist.brand"), this.font),
+					this.brandBox());
+			this.list.addBig(ScreenWidgets.button("options.modlist.hidden_mods",
+					() -> this.minecraft.gui.setScreen(new HiddenModsScreen(this, this.profile))));
+			this.list.addBig(ScreenWidgets.button("options.modlist.fake_mods",
+					() -> this.minecraft.gui.setScreen(new StringListScreen(this,
+							Component.translatable("options.modlist.fake_mods.title"),
+							Component.translatable("options.modlist.fake_mods.description"),
+							Component.translatable("options.modlist.fake_mods.hint"),
+							Component.translatable("options.modlist.fake_mods.entry"),
+							this.profile.fakeChannels(), ChannelEntries::isValidFakeEntry, this.profile::setFakeChannels))));
+		}
+		if (mode != ReportMode.ACTUAL) {
+			this.list.addBig(toggle("options.modlist.protect_hidden_translations",
+					this.profile.protectHiddenTranslations(), this.profile::setProtectHiddenTranslations));
+		}
+	}
 
-		this.updateReportMode();
+	@Override
+	public void tick() {
+		if (this.pendingRefresh) {
+			this.pendingRefresh = false;
+			this.refreshOptions();
+		}
 	}
 
 	private EditBox addressBox(final ServerProfile server) {
@@ -108,39 +114,13 @@ public final class ProfileScreen extends OptionsSubScreen {
 	}
 
 	private EditBox brandBox() {
-		EditBox box = new EditBox(this.font, 310, 20, Component.translatable("options.modlist.brand"));
+		EditBox box = new EditBox(this.font, HALF_WIDTH, 20, Component.translatable("options.modlist.brand"));
 		box.setMaxLength(MAX_BRAND_LENGTH);
 		box.setHint(Component.translatable("options.modlist.brand.hint").withStyle(EditBox.SEARCH_HINT_STYLE));
 		box.setTooltip(Tooltip.create(Component.translatable("options.modlist.brand.tooltip")));
 		box.setValue(this.profile.brand());
-		box.setResponder(text -> {
-			this.profile.setBrand(text);
-			this.updateReportMode();
-		});
+		box.setResponder(this.profile::setBrand);
 		return box;
-	}
-
-	private void setReportMode(final ReportMode mode) {
-		this.profile.setReportMode(mode);
-		this.updateReportMode();
-	}
-
-	/** Shows the current report mode and disables the button that would select it again. */
-	private void updateReportMode() {
-		ReportMode mode = this.profile.reportMode();
-		if (this.modeStatus != null) {
-			this.modeStatus.setMessage(Component.translatable("options.modlist.report_mode.current", mode.label()));
-			this.modeStatus.setTooltip(Tooltip.create(mode.description()));
-		}
-		setActive(this.mimicVanilla, mode != ReportMode.VANILLA);
-		setActive(this.mimicServer, mode != ReportMode.SERVER);
-		setActive(this.restoreCurrent, mode != ReportMode.ACTUAL);
-	}
-
-	private static void setActive(final @Nullable Button button, final boolean active) {
-		if (button != null) {
-			button.active = active;
-		}
 	}
 
 	/**

@@ -10,6 +10,7 @@
 		],
 		"fabric-client-gametest": [
 			"com.urntt.modlist.gametest.ModListLogicGameTest",
+			"com.urntt.modlist.gametest.ModListScreenGameTest",
 			"com.urntt.modlist.gametest.ModListMultiplayerGameTest"
 		]
 	},

@@ -60,7 +60,7 @@ These are informational; differences never block joining. Turn them off with **J
 
 ### Settings profiles
 
-All connection settings belong to a profile. The **Default Settings** apply to every server without its own settings. **Server Settings** lists per-server profiles; each matches by the address you connect to, ignoring case. An address without a port, such as `mc.example.com`, matches the server on any port; with a port, such as `mc.example.com:25566`, only that port. The first matching profile is used, and profiles that never match because an earlier one matches first are shown in red. A new server profile starts as a copy of the default settings.
+All connection settings belong to a profile. The **Default Settings** apply to every server without its own settings. **Server Settings** lists per-server profiles: type an address and press **Add** to add one as a copy of the default settings, then **Edit** it. Each matches by the address you connect to, ignoring case. An address without a port, such as `mc.example.com`, matches the server on any port; with a port, such as `mc.example.com:25566`, only that port. The first matching profile is used, and profiles that never match because an earlier one matches first are shown in red.
 
 The **Server Report** shows the last server's address, which settings were used, the server's brand and channels by namespace, the channels hidden and faked, and the registry entries ignored. **Edit Settings for This Server** opens or creates that server's profile.
 
@@ -75,22 +75,23 @@ Singleplayer worlds, worlds you open to LAN, and server list pings are never aff
 
 ### Reported to the server
 
-The three one-click buttons choose what the server sees. The active choice is shown above them:
+**Reported Mods** chooses what the server sees:
 
-| Button | Brand | Hidden mods | Faked mods |
+| Value | Brand | Hidden mods | Faked mods |
 | --- | --- | --- | --- |
-| Restore Current (default) | real | none | none |
+| Unchanged (default) | real | none | none |
 | Mimic Vanilla | `vanilla` | all, and their data and login answers are suppressed | none |
 | Mimic Server | real | those the server does not announce | every channel the server announces |
+| Custom | the settings below | the settings below | the settings below |
 
-Editing any of the custom settings below switches to custom mode. Switching modes never clears the custom settings.
+The custom settings are only shown when **Custom** is selected. Choosing another value keeps them for later.
 
 | Setting | Default | Meaning |
 | --- | --- | --- |
-| Protect Hidden Mods' Translations | On | Signs you edit and anvil names keep hidden mods' translation keys and key binding names untranslated, as a client without those mods would. |
-| Client brand | empty | The brand reported in custom mode, for example `vanilla`. Empty keeps the real brand. |
+| Client brand | empty | The brand to report, for example `vanilla`. Empty keeps the real brand. |
 | Hidden Mods | none | Channel namespaces whose channels, data and login answers are hidden from the server. The `minecraft` namespace cannot be hidden. |
-| Fake Mods | none | Mods to claim in custom mode. A mod ID claims every channel the server announces in that namespace; a full channel ID such as `examplemod:handshake` claims that channel. The server only announces the channels it receives on, so a server mod that checks a different channel needs that channel's full ID. |
+| Fake Mods | none | Mods to claim although they are not installed. A mod ID claims every channel the server announces in that namespace; a full channel ID such as `examplemod:handshake` claims that channel. The server only announces the channels it receives on, so a server mod that checks a different channel needs that channel's full ID. |
+| Protect Hidden Mods' Translations | On | Shown unless the value is **Unchanged**. Signs you edit and anvil names keep hidden mods' translation keys and key binding names untranslated, as a client without those mods would. |
 
 ## Development
 

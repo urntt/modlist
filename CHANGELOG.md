@@ -6,6 +6,17 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 
 ## [Unreleased]
 
+### Changed
+
+- Choose what is reported to the server with a single "Reported Mods" option (Unchanged, Mimic Vanilla, Mimic Server, Custom) instead of three buttons. The client brand, hidden mods and fake mods are only shown for Custom, and translation protection only when something is hidden.
+- Adding a server profile now adds it to the list and clears the address box instead of opening it; use Edit to change it.
+
+### Fixed
+
+- Removing a server profile now removes it at once instead of darkening the screen and leaving the profile editable until the list was reopened.
+- The server profile list shows profiles added or edited in the meantime when you return to it.
+- Section titles on the settings screens no longer show a selection border when clicked.
+
 ## [1.0.0+26.3] - 2026-11-17
 
 ### Added
