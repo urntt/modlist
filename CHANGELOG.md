@@ -6,6 +6,8 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 
 ## [Unreleased]
 
+## [1.0.0+26.3] - 2026-11-17
+
 ### Added
 
 - Show join notices in chat that list ignored registry entries, the mods only the server has, and the client's mods the server announced no channels for. Mismatched mods never block joining.
