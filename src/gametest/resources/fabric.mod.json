@@ -1,0 +1,25 @@
+{
+	"schemaVersion": 1,
+	"id": "modlist-gametest",
+	"version": "0.0.0",
+	"name": "modlist game tests",
+	"environment": "client",
+	"entrypoints": {
+		"client": [
+			"com.urntt.modlist.gametest.TestPayloads"
+		],
+		"fabric-client-gametest": [
+			"com.urntt.modlist.gametest.ModListLogicGameTest",
+			"com.urntt.modlist.gametest.ModListMultiplayerGameTest"
+		]
+	},
+	"mixins": [
+		{
+			"config": "modlist-gametest.mixins.json",
+			"environment": "client"
+		}
+	],
+	"depends": {
+		"modlist": "*"
+	}
+}

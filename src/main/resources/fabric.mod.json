@@ -1,0 +1,40 @@
+{
+	"schemaVersion": 1,
+	"id": "modlist",
+	"version": "${version}",
+	"name": "modlist",
+	"description": "Lets players edit the mod-related communication between the client and the server.",
+	"authors": [
+		"urntt"
+	],
+	"contact": {
+		"homepage": "https://github.com/urntt/modlist",
+		"sources": "https://github.com/urntt/modlist",
+		"issues": "https://github.com/urntt/modlist/issues"
+	},
+	"license": "MIT",
+	"environment": "client",
+	"entrypoints": {
+		"client": [
+			"com.urntt.modlist.ModListClient"
+		],
+		"modmenu": [
+			"com.urntt.modlist.compat.ModMenuIntegration"
+		]
+	},
+	"mixins": [
+		{
+			"config": "modlist.client.mixins.json",
+			"environment": "client"
+		}
+	],
+	"depends": {
+		"fabricloader": ">=${loader_version}",
+		"minecraft": "~${minecraft_version}",
+		"java": ">=${java_version}",
+		"fabric-api": ">=${fabric_api_version}"
+	},
+	"suggests": {
+		"modmenu": "*"
+	}
+}

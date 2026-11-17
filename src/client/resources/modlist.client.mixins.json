@@ -1,0 +1,22 @@
+{
+	"required": true,
+	"package": "com.urntt.modlist.mixin",
+	"compatibilityLevel": "JAVA_${java_version}",
+	"client": [
+		"AbstractSignEditScreenMixin",
+		"AnvilScreenMixin",
+		"ClientCommonPacketListenerImplAccessor",
+		"ClientHandshakePacketListenerImplAccessor",
+		"ClientRegistrySyncHandlerMixin",
+		"ConnectionMixin",
+		"IdMapperMixin",
+		"MappedRegistryAccessor",
+		"SynchedEntityDataMixin"
+	],
+	"injectors": {
+		"defaultRequire": 1
+	},
+	"overwrites": {
+		"requireAnnotations": true
+	}
+}

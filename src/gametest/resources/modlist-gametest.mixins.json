@@ -1,0 +1,13 @@
+{
+	"required": true,
+	"package": "com.urntt.modlist.gametest.mixin",
+	"compatibilityLevel": "JAVA_${java_version}",
+	"client": [
+		"DisconnectedScreenAccessor",
+		"RegistrySyncManagerMixin",
+		"ServerConnectionMixin"
+	],
+	"injectors": {
+		"defaultRequire": 1
+	}
+}
