@@ -5,13 +5,11 @@ import java.util.List;
 import java.util.Set;
 import java.util.function.Consumer;
 import java.util.function.Predicate;
-import net.minecraft.ChatFormatting;
 import net.minecraft.client.Minecraft;
 import net.minecraft.client.gui.GuiGraphicsExtractor;
 import net.minecraft.client.gui.components.Button;
 import net.minecraft.client.gui.components.ContainerObjectSelectionList;
 import net.minecraft.client.gui.components.EditBox;
-import net.minecraft.client.gui.components.StringWidget;
 import net.minecraft.client.gui.components.events.GuiEventListener;
 import net.minecraft.client.gui.layouts.HeaderAndFooterLayout;
 import net.minecraft.client.gui.layouts.LinearLayout;
@@ -64,15 +62,12 @@ public final class StringListScreen extends Screen {
 		this.initialEntries = List.copyOf(entries);
 		this.validator = validator;
 		this.onSave = onSave;
-		this.layout = new HeaderAndFooterLayout(this, 12 + 9 + SPACING + 9, 33);
+		this.layout = new HeaderAndFooterLayout(this, ScreenWidgets.HEADER_HEIGHT, ScreenWidgets.FOOTER_HEIGHT);
 	}
 
 	@Override
 	protected void init() {
-		LinearLayout header = this.layout.addToHeader(LinearLayout.vertical().spacing(SPACING));
-		header.defaultCellSetting().alignHorizontallyCenter();
-		header.addChild(new StringWidget(this.title, this.font));
-		header.addChild(new StringWidget(this.description.copy().withStyle(ChatFormatting.GRAY), this.font));
+		ScreenWidgets.addHeader(this.layout, this.title, this.description, this.font);
 
 		this.invalidEntries.clear();
 		this.entryList = this.layout.addToContents(new EntryList(this.initialEntries));

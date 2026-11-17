@@ -44,15 +44,12 @@ public final class ServerProfilesScreen extends Screen {
 		super(TITLE);
 		this.parent = parent;
 		this.config = config;
-		this.layout = new HeaderAndFooterLayout(this, 12 + 9 + SPACING + 9, 33);
+		this.layout = new HeaderAndFooterLayout(this, ScreenWidgets.HEADER_HEIGHT, ScreenWidgets.FOOTER_HEIGHT);
 	}
 
 	@Override
 	protected void init() {
-		LinearLayout header = this.layout.addToHeader(LinearLayout.vertical().spacing(SPACING));
-		header.defaultCellSetting().alignHorizontallyCenter();
-		header.addChild(new StringWidget(TITLE, this.font));
-		header.addChild(new StringWidget(DESCRIPTION.copy().withStyle(ChatFormatting.GRAY), this.font));
+		ScreenWidgets.addHeader(this.layout, TITLE, DESCRIPTION, this.font);
 
 		this.profileList = this.layout.addToContents(new ProfileList(this.config.serverProfiles()));
 

@@ -54,7 +54,7 @@ After you join a server, chat lists, when there are any:
 
 - the registry entries that were ignored, grouped by namespace (hover for details);
 - the mods the server has and your client does not;
-- the mods your client has and the server does not.
+- your mods the server announced no channels for. The server only announces the channels it receives on, so this also lists mods that only receive data from the server.
 
 These are informational; differences never block joining. Turn them off with **Join Notices** on the main settings screen.
 

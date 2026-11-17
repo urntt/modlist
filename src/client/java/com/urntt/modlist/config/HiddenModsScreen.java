@@ -7,8 +7,6 @@ import java.util.List;
 import java.util.Map;
 import java.util.TreeMap;
 import net.fabricmc.loader.api.FabricLoader;
-import net.fabricmc.loader.api.ModContainer;
-import net.minecraft.ChatFormatting;
 import net.minecraft.client.Minecraft;
 import net.minecraft.client.gui.GuiGraphicsExtractor;
 import net.minecraft.client.gui.components.Button;
@@ -52,15 +50,12 @@ public final class HiddenModsScreen extends Screen {
 		super(TITLE);
 		this.parent = parent;
 		this.profile = profile;
-		this.layout = new HeaderAndFooterLayout(this, 12 + 9 + SPACING + 9, 33);
+		this.layout = new HeaderAndFooterLayout(this, ScreenWidgets.HEADER_HEIGHT, ScreenWidgets.FOOTER_HEIGHT);
 	}
 
 	@Override
 	protected void init() {
-		LinearLayout header = this.layout.addToHeader(LinearLayout.vertical().spacing(SPACING));
-		header.defaultCellSetting().alignHorizontallyCenter();
-		header.addChild(new StringWidget(TITLE, this.font));
-		header.addChild(new StringWidget(DESCRIPTION.copy().withStyle(ChatFormatting.GRAY), this.font));
+		ScreenWidgets.addHeader(this.layout, TITLE, DESCRIPTION, this.font);
 
 		this.namespaceList = this.layout.addToContents(new NamespaceList(channelCounts(), this.profile.hiddenNamespaces()));
 
@@ -133,13 +128,13 @@ public final class HiddenModsScreen extends Screen {
 
 		private Row(final String namespace, final int channels, final boolean hidden) {
 			this.namespace = namespace;
-			Component name = FabricLoader.getInstance().getModContainer(namespace)
-					.map(ModContainer::getMetadata)
-					.<Component>map(metadata -> Component.translatable("options.modlist.hidden_mods.named",
-							metadata.getName(), namespace))
-					.orElse(Component.literal(namespace));
-			this.label = new StringWidget(ROW_WIDTH - TOGGLE_WIDTH - SPACING, 20,
-					Component.translatable("options.modlist.hidden_mods.row", name, channels), HiddenModsScreen.this.font);
+			Component name = Component.literal(FabricLoader.getInstance().getModContainer(namespace)
+					.map(mod -> mod.getMetadata().getName())
+					.orElse(namespace));
+			this.label = new StringWidget(ROW_WIDTH - TOGGLE_WIDTH - SPACING, 20, name, HiddenModsScreen.this.font)
+					.setMaxWidth(ROW_WIDTH - TOGGLE_WIDTH - SPACING, StringWidget.TextOverflow.SCROLLING);
+			this.label.setTooltip(Tooltip.create(Component.translatable("options.modlist.hidden_mods.details",
+					namespace, channels)));
 			this.toggle = CycleButton.booleanBuilder(HIDDEN, REPORTED, hidden)
 					.displayOnlyValue()
 					.create(0, 0, TOGGLE_WIDTH, 20, Component.literal(namespace));

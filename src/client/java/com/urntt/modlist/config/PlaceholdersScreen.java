@@ -5,7 +5,6 @@ import java.util.HashSet;
 import java.util.LinkedHashMap;
 import java.util.Map;
 import java.util.Set;
-import net.minecraft.ChatFormatting;
 import net.minecraft.client.gui.components.Button;
 import net.minecraft.client.gui.components.EditBox;
 import net.minecraft.client.gui.components.StringWidget;
@@ -43,15 +42,12 @@ public final class PlaceholdersScreen extends Screen {
 		super(TITLE);
 		this.parent = parent;
 		this.profile = profile;
-		this.layout = new HeaderAndFooterLayout(this, 12 + 9 + SPACING + 9, 33);
+		this.layout = new HeaderAndFooterLayout(this, ScreenWidgets.HEADER_HEIGHT, ScreenWidgets.FOOTER_HEIGHT);
 	}
 
 	@Override
 	protected void init() {
-		LinearLayout header = this.layout.addToHeader(LinearLayout.vertical().spacing(SPACING));
-		header.defaultCellSetting().alignHorizontallyCenter();
-		header.addChild(new StringWidget(TITLE, this.font));
-		header.addChild(new StringWidget(DESCRIPTION.copy().withStyle(ChatFormatting.GRAY), this.font));
+		ScreenWidgets.addHeader(this.layout, TITLE, DESCRIPTION, this.font);
 
 		this.boxes.clear();
 		this.invalidBoxes.clear();
@@ -61,7 +57,7 @@ public final class PlaceholdersScreen extends Screen {
 			String registryKey = "options.modlist.placeholders." + registry.identifier().getPath();
 			LinearLayout row = rows.addChild(LinearLayout.horizontal().spacing(SPACING));
 			row.defaultCellSetting().alignVerticallyMiddle();
-			row.addChild(new StringWidget(LABEL_WIDTH, 20, Component.translatable(registryKey), this.font));
+			row.addChild(new StringWidget(LABEL_WIDTH, this.font.lineHeight, Component.translatable(registryKey), this.font));
 
 			EditBox box = new EditBox(this.font, BOX_WIDTH, 20, Component.translatable(registryKey));
 			box.setMaxLength(MAX_ENTRY_LENGTH);

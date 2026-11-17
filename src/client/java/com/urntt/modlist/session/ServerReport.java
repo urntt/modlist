@@ -78,8 +78,8 @@ public final class ServerReport {
 	}
 
 	private static Component entry(final String name, final Collection<String> values) {
-		return Component.literal(name + ": ").withStyle(ChatFormatting.GRAY)
-				.append(Component.literal(String.join(", ", values)).withStyle(ChatFormatting.WHITE));
+		return Component.translatable("message.modlist.entry",
+				Component.literal(name).withStyle(ChatFormatting.GRAY), String.join(", ", values));
 	}
 
 	private static Component orUnknown(final @Nullable String value) {

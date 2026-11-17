@@ -16,7 +16,8 @@ import org.spongepowered.asm.mixin.injection.At;
  */
 @Mixin(AbstractSignEditScreen.class)
 abstract class AbstractSignEditScreenMixin {
-	@WrapOperation(method = "<init>", at = @At(value = "INVOKE",
+	@WrapOperation(method = "<init>(Lnet/minecraft/world/level/block/entity/SignBlockEntity;Lnet/minecraft/world/level/block/entity/SignTextSlot;ZLnet/minecraft/network/chat/Component;)V",
+			at = @At(value = "INVOKE",
 			target = "Lnet/minecraft/network/chat/Component;getString()Ljava/lang/String;"))
 	private String modlist$hideProbedTranslations(final Component line, final Operation<String> original) {
 		return ProbeSafeText.getString(line, HiddenTranslations.currentKeys(), original::call);

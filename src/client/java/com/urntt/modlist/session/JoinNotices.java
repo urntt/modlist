@@ -122,8 +122,8 @@ public final class JoinNotices {
 			first = false;
 			List<Identifier> entries = registry.getValue();
 			List<String> named = entries.stream().limit(LISTED_ENTRIES).map(Identifier::toString).toList();
-			details.append(Component.literal(registry.getKey() + ": ").withStyle(ChatFormatting.YELLOW))
-					.append(String.join(", ", named));
+			details.append(Component.translatable("message.modlist.entry",
+					Component.literal(registry.getKey().toString()).withStyle(ChatFormatting.YELLOW), String.join(", ", named)));
 			if (entries.size() > named.size()) {
 				details.append(CommonComponents.SPACE)
 						.append(Component.translatable("message.modlist.more", entries.size() - named.size()));
