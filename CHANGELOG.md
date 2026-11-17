@@ -6,6 +6,8 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 
 ## [Unreleased]
 
+## [1.0.1+26.3] - 2026-11-17
+
 ### Changed
 
 - Choose what is reported to the server with a single "Reported Mods" option (Unchanged, Mimic Vanilla, Mimic Server, Custom) instead of three buttons. The client brand, hidden mods and fake mods are only shown for Custom, and translation protection only when something is hidden.
