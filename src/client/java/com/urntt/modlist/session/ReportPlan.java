@@ -1,6 +1,6 @@
 package com.urntt.modlist.session;
 
-import com.urntt.modlist.config.Profile;
+import com.urntt.modlist.config.ProfileSettings;
 import com.urntt.modlist.config.ReportMode;
 import java.util.Collection;
 import java.util.LinkedHashSet;
@@ -31,7 +31,7 @@ public final class ReportPlan {
 		this.customFakes = customFakes;
 	}
 
-	public static ReportPlan of(final Profile profile) {
+	public static ReportPlan of(final ProfileSettings profile) {
 		return new ReportPlan(profile.reportMode(), profile.brand(), Set.copyOf(profile.hiddenNamespaces()),
 				profile.fakeChannels());
 	}

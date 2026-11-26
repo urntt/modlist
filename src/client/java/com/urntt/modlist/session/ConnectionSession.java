@@ -1,6 +1,6 @@
 package com.urntt.modlist.session;
 
-import com.urntt.modlist.config.Profile;
+import com.urntt.modlist.config.ProfileSettings;
 import com.urntt.modlist.registry.RegistrySyncFilter;
 import java.util.Collections;
 import java.util.Map;
@@ -19,7 +19,7 @@ import org.jspecify.annotations.Nullable;
 public final class ConnectionSession {
 	private final Connection connection;
 	private final @Nullable String address;
-	private final Profile profile;
+	private final ProfileSettings profile;
 	private final boolean serverProfile;
 
 	private final Set<Identifier> serverChannels = ConcurrentHashMap.newKeySet();
@@ -36,7 +36,7 @@ public final class ConnectionSession {
 	private volatile RegistrySyncFilter.@Nullable Result ignoredRegistryContent;
 	private final AtomicBoolean noticesShown = new AtomicBoolean();
 
-	ConnectionSession(final Connection connection, final @Nullable String address, final Profile profile,
+	ConnectionSession(final Connection connection, final @Nullable String address, final ProfileSettings profile,
 			final boolean serverProfile) {
 		this.connection = connection;
 		this.address = address;
@@ -53,7 +53,7 @@ public final class ConnectionSession {
 		return this.address;
 	}
 
-	public Profile profile() {
+	public ProfileSettings profile() {
 		return this.profile;
 	}
 

@@ -12,6 +12,8 @@ import org.jspecify.annotations.Nullable;
  */
 abstract class ModListOptionsScreen extends OptionsSubScreen {
 	private @Nullable ModListOptionsList optionsList;
+	/** Set when the options should be rebuilt on the next tick, outside the click handling of the list. */
+	private boolean pendingRefresh;
 
 	ModListOptionsScreen(final @Nullable Screen parent, final Component title) {
 		super(parent, Minecraft.getInstance().options, title);
@@ -35,6 +37,23 @@ abstract class ModListOptionsScreen extends OptionsSubScreen {
 	protected final void refreshOptions() {
 		if (this.optionsList != null) {
 			this.optionsList.rebuild(this::addOptions);
+		}
+	}
+
+	/**
+	 * Rebuilds the options on the next tick. Use it from a click inside the list, which is still iterating over the
+	 * entries that a rebuild would replace.
+	 */
+	protected final void refreshOptionsLater() {
+		this.pendingRefresh = true;
+	}
+
+	@Override
+	public void tick() {
+		super.tick();
+		if (this.pendingRefresh) {
+			this.pendingRefresh = false;
+			this.refreshOptions();
 		}
 	}
 }

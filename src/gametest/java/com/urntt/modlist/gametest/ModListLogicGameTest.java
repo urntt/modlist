@@ -3,11 +3,19 @@ package com.urntt.modlist.gametest;
 import static com.urntt.modlist.gametest.GameTestSupport.LOGGER;
 import static com.urntt.modlist.gametest.GameTestSupport.check;
 import static com.urntt.modlist.gametest.GameTestSupport.checkEquals;
+import static com.urntt.modlist.gametest.GameTestSupport.oneConfig;
 import static com.urntt.modlist.gametest.GameTestSupport.resetConfig;
+import static com.urntt.modlist.gametest.GameTestSupport.resetOneConfig;
+import static com.urntt.modlist.gametest.GameTestSupport.setOneConfig;
 
 import com.urntt.modlist.ModListClient;
+import com.urntt.modlist.compat.OneConfigBridge;
+import com.urntt.modlist.config.ConfigMode;
 import com.urntt.modlist.config.ModListConfig;
+import com.urntt.modlist.config.ModListSettings;
 import com.urntt.modlist.config.Profile;
+import com.urntt.modlist.config.ProfileSettings;
+import com.urntt.modlist.config.SettingKeys;
 import com.urntt.modlist.config.ReportMode;
 import com.urntt.modlist.config.ServerProfile;
 import com.urntt.modlist.probe.HiddenTranslations;
@@ -23,7 +31,10 @@ import it.unimi.dsi.fastutil.objects.Object2IntMap;
 import java.io.IOException;
 import java.io.UncheckedIOException;
 import java.nio.file.Files;
+import java.lang.annotation.Annotation;
 import java.nio.file.Path;
+import java.util.ArrayList;
+import java.util.Arrays;
 import java.util.EnumSet;
 import java.util.LinkedHashMap;
 import java.util.List;
@@ -58,6 +69,10 @@ public final class ModListLogicGameTest implements FabricClientGameTest {
 			checkUnreadableFile();
 			checkNormalization();
 			checkProfileSelection();
+			checkModes();
+			if (OneConfigBridge.isAvailable()) {
+				checkOneConfig();
+			}
 			checkReportPlans();
 			checkChannelRewriter();
 			checkRegistrySyncFilter();
@@ -72,6 +87,7 @@ public final class ModListLogicGameTest implements FabricClientGameTest {
 	private static void checkDefaults() {
 		ModListConfig config = ModListClient.config();
 		check(Files.exists(ModListConfig.defaultPath()), "the config file should be created with the defaults");
+		checkEquals(ConfigMode.CUSTOM, config.storedMode(), "default mode");
 		check(config.joinNotices(), "join notices should be enabled by default");
 		check(config.serverProfiles().isEmpty(), "there should be no server profiles by default");
 		Profile profile = config.defaultProfile();
@@ -132,7 +148,7 @@ public final class ModListLogicGameTest implements FabricClientGameTest {
 						"brand": "  vanilla ",
 						"hiddenNamespaces": ["minecraft", "Bad Namespace", "xaero", " xaero ", null],
 						"fakeChannels": ["examplemod", "examplemod:handshake", "bad entry", ":x", "foo:"],
-						"placeholders": {"minecraft:block": "minecraft:barrier", "not an id!": "x"}
+						"placeholders": {"minecraft:block": "minecraft:barrier", "minecraft:item": " ", "not an id!": "x"}
 					},
 					"servers": [{"address": "not an address!"}, {"address": "mc.example.com"}, null]
 				}
@@ -142,7 +158,7 @@ public final class ModListLogicGameTest implements FabricClientGameTest {
 		checkEquals("vanilla", profile.brand(), "the brand is trimmed");
 		checkEquals(List.of("xaero"), profile.hiddenNamespaces(), "hidden namespaces keep only hideable, distinct ones");
 		checkEquals(List.of("examplemod", "examplemod:handshake"), profile.fakeChannels(), "fake channels keep only valid entries");
-		checkEquals(Map.of("minecraft:block", "minecraft:barrier"), profile.placeholders(), "placeholders keep only identifiers");
+		checkEquals(Map.of("minecraft:block", "minecraft:barrier"), profile.placeholders(), "placeholders keep only identifiers, without blank entries");
 		checkEquals(1, ModListConfig.load(path).serverProfiles().size(), "server profiles without a valid address are dropped");
 		check(!ChannelEntries.isHideable("minecraft"), "the minecraft namespace must not be hideable");
 		LOGGER.info("Normalization checked");
@@ -155,13 +171,109 @@ public final class ModListLogicGameTest implements FabricClientGameTest {
 		Profile ported = config.addServerProfile("play.test.net:25570").profile();
 		Profile fallback = config.defaultProfile();
 
-		check(config.profileFor("MC.EXAMPLE.COM") == any, "addresses match ignoring case");
-		check(config.profileFor("mc.example.com:25566") == any, "the first matching profile wins");
-		check(config.profileFor("play.test.net:25570") == ported, "an address with a port matches that port");
-		check(config.profileFor("play.test.net") == fallback, "an address with a port does not match the default port");
-		check(config.profileFor("other.example.net") == fallback, "unmatched servers use the default profile");
-		check(config.profileFor(null) == fallback, "an unknown address uses the default profile");
+		check(config.effectiveProfileFor("MC.EXAMPLE.COM") == any, "addresses match ignoring case");
+		check(config.effectiveProfileFor("mc.example.com:25566") == any, "the first matching profile wins");
+		check(config.effectiveProfileFor("play.test.net:25570") == ported, "an address with a port matches that port");
+		check(config.effectiveProfileFor("play.test.net") == fallback, "an address with a port does not match the default port");
+		check(config.effectiveProfileFor("other.example.net") == fallback, "unmatched servers use the default profile");
+		check(config.effectiveProfileFor(null) == fallback, "an unknown address uses the default profile");
 		LOGGER.info("Profile selection checked");
+	}
+
+	private static void checkModes() {
+		Path path = tempConfig("modes", null);
+		ModListConfig config = ModListConfig.load(path);
+		config.addServerProfile("mc.example.com");
+		check(config.effective() == config, "custom mode applies the mod's own settings");
+		check(config.isActive() && config.effectiveJoinNotices(), "custom mode shows join notices by default");
+
+		config.setMode(ConfigMode.DISABLED);
+		checkEquals(ConfigMode.DISABLED, ModListConfig.load(path).storedMode(), "saved mode");
+		check(config.effective() == null && !config.isActive(), "disabled mode applies no settings");
+		check(config.effectiveProfileFor("mc.example.com") == null && config.effectiveProfileFor("other.example.net") == null
+				&& config.effectiveProfileFor(null) == null, "disabled mode leaves every connection alone");
+		check(!config.effectiveJoinNotices(), "disabled mode shows no join notices");
+		check(config.joinNotices(), "disabled mode keeps the saved join notices setting");
+
+		config.setMode(ConfigMode.ONECONFIG);
+		ModListConfig reloaded = ModListConfig.load(path);
+		checkEquals(ConfigMode.ONECONFIG, reloaded.storedMode(), "OneConfig mode is saved");
+		if (OneConfigBridge.isAvailable()) {
+			checkEquals(ConfigMode.ONECONFIG, reloaded.effectiveMode(), "OneConfig mode applies while OneConfig is installed");
+			check(reloaded.effectiveProfileFor("other.example.net") == oneConfig().defaultProfile(),
+					"OneConfig's default profile applies to servers without a server profile");
+		} else {
+			checkEquals(ConfigMode.CUSTOM, reloaded.effectiveMode(), "OneConfig mode falls back to custom without OneConfig");
+			check(reloaded.effective() == reloaded, "the fallback applies the mod's own settings");
+			check(reloaded.effectiveProfileFor("other.example.net") == reloaded.defaultProfile(),
+					"the fallback applies the mod's own default profile");
+			checkEquals(ConfigMode.ONECONFIG, ModListConfig.load(path).storedMode(), "the fallback keeps the saved mode");
+		}
+		check(reloaded.effectiveProfileFor("mc.example.com") == reloaded.serverProfiles().getFirst().profile(),
+				"server profiles apply in OneConfig mode, with or without OneConfig");
+
+		ModListConfig misspelled = ModListConfig.load(tempConfig("bad-mode", "{\"mode\": \"bogus\"}"));
+		checkEquals(ConfigMode.CUSTOM, misspelled.storedMode(), "an unknown mode falls back to custom");
+		LOGGER.info("Configuration modes checked (OneConfig installed: {})", OneConfigBridge.isAvailable());
+	}
+
+	/** Only runs with OneConfig installed: OneConfig's values drive the default profile in OneConfig mode. */
+	private static void checkOneConfig() {
+		ModListSettings settings = oneConfig();
+		ProfileSettings profile = settings.defaultProfile();
+		try {
+			checkEquals(ReportMode.ACTUAL, profile.reportMode(), "OneConfig's default report mode");
+			check(settings.joinNotices() && settings.enabled() && profile.protectHiddenTranslations()
+					&& !profile.ignoreUnknownRegistryEntries(), "OneConfig's defaults match the mod's own");
+
+			setOneConfig("hiddenNamespaces", new ArrayList<>(List.of("minecraft", "xaero", " xaero ", "Bad Namespace")));
+			setOneConfig("fakeChannels", new ArrayList<>(List.of("examplemod", "bad entry", "fakemod:handshake")));
+			setOneConfig("blockPlaceholder", " minecraft:barrier ");
+			setOneConfig("itemPlaceholder", "not an id!");
+			setOneConfig("brand", "  vanilla ");
+			setOneConfig("reportMode", 99);
+			checkEquals(List.of("xaero"), profile.hiddenNamespaces(), "OneConfig's hidden namespaces are cleaned");
+			checkEquals(List.of("examplemod", "fakemod:handshake"), profile.fakeChannels(), "OneConfig's fake channels are cleaned");
+			checkEquals(Map.of("minecraft:block", "minecraft:barrier"), profile.placeholders(), "OneConfig's placeholders are cleaned");
+			checkEquals("vanilla", profile.brand(), "OneConfig's brand is trimmed");
+			checkEquals(ReportMode.ACTUAL, profile.reportMode(), "an out-of-range report mode falls back to the default");
+
+			// The dropdown's options must follow ReportMode's order, which its index maps to.
+			List<String> options = dropdownOptions(settings, "reportMode");
+			checkEquals(Arrays.stream(ReportMode.values()).map(mode -> SettingKeys.REPORT_MODE_PREFIX + mode.getSerializedName()).toList(),
+					options, "OneConfig's report mode options");
+			for (ReportMode mode : ReportMode.values()) {
+				setOneConfig("reportMode", mode.ordinal());
+				checkEquals(mode, profile.reportMode(), "report mode at OneConfig's index " + mode.ordinal());
+			}
+
+			ModListConfig config = ModListConfig.load(tempConfig("oneconfig", null));
+			config.setMode(ConfigMode.ONECONFIG);
+			Profile copy = config.addServerProfile("copy.example.net").profile();
+			checkEquals(ReportMode.CUSTOM, copy.reportMode(), "a new server profile copies OneConfig's report mode");
+			checkEquals("vanilla", copy.brand(), "a new server profile copies OneConfig's brand");
+
+			setOneConfig("enabled", false);
+			check(config.effective() == null && !config.isActive(), "the toggle on OneConfig's card turns the mod off");
+			check(config.effectiveProfileFor("copy.example.net") == null, "server profiles do not apply while it is off");
+		} finally {
+			resetOneConfig();
+		}
+		LOGGER.info("OneConfig settings checked");
+	}
+
+	/** Reads the options of a OneConfig dropdown by reflection, so the tests compile without OneConfig. */
+	private static List<String> dropdownOptions(final Object settings, final String field) {
+		try {
+			for (Annotation annotation : settings.getClass().getField(field).getAnnotations()) {
+				if (annotation.annotationType().getSimpleName().equals("Dropdown")) {
+					return List.of((String[]) annotation.annotationType().getMethod("options").invoke(annotation));
+				}
+			}
+		} catch (ReflectiveOperationException e) {
+			throw new AssertionError("cannot read the options of " + field, e);
+		}
+		throw new AssertionError(field + " is not a dropdown");
 	}
 
 	private static void checkReportPlans() {

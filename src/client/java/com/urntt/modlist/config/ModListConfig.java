@@ -4,6 +4,7 @@ import com.google.gson.Gson;
 import com.google.gson.GsonBuilder;
 import com.google.gson.JsonParseException;
 import com.urntt.modlist.ModListClient;
+import com.urntt.modlist.compat.OneConfigBridge;
 import java.io.IOException;
 import java.nio.file.Files;
 import java.nio.file.Path;
@@ -15,9 +16,10 @@ import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
 /**
- * The mod's settings, persisted as JSON. Every change is written to disk immediately.
+ * The mod's own settings, the server profiles and the configuration mode, persisted as JSON. Every change is written
+ * to disk immediately.
  */
-public final class ModListConfig {
+public final class ModListConfig implements ModListSettings {
 	private static final Logger LOGGER = LoggerFactory.getLogger(ModListClient.MOD_ID);
 	private static final Gson GSON = new GsonBuilder().setPrettyPrinting().disableHtmlEscaping().create();
 
@@ -67,7 +69,65 @@ public final class ModListConfig {
 		return config;
 	}
 
+	/** The mode stored in the file, which may name OneConfig even while OneConfig is not installed. */
+	public ConfigMode storedMode() {
+		return this.settings.mode;
+	}
+
+	public void setMode(final ConfigMode mode) {
+		this.settings.mode = mode;
+		this.save();
+	}
+
+	/** The mode that applies: OneConfig mode falls back to the custom settings while OneConfig is not available. */
+	public ConfigMode effectiveMode() {
+		ConfigMode mode = this.settings.mode;
+		return mode == ConfigMode.ONECONFIG && !OneConfigBridge.isAvailable() ? ConfigMode.CUSTOM : mode;
+	}
+
+	/**
+	 * The settings that apply in the {@linkplain #effectiveMode() effective mode}, or {@code null} while the mod is off:
+	 * in disabled mode, or in OneConfig mode while the toggle on OneConfig's card is off.
+	 */
+	public @Nullable ModListSettings effective() {
+		ModListSettings settings = switch (this.effectiveMode()) {
+			case DISABLED -> null;
+			case CUSTOM -> this;
+			case ONECONFIG -> OneConfigBridge.settings().orElse(this);
+		};
+		return settings != null && settings.enabled() ? settings : null;
+	}
+
+	/**
+	 * Whether the mod changes connections: not in disabled mode, nor in OneConfig mode while the toggle on OneConfig's
+	 * card is off. While it does not, profiles cannot be edited from the screens, because they have no effect.
+	 */
+	public boolean isActive() {
+		return this.effective() != null;
+	}
+
+	/** Whether join notices are shown, as the {@linkplain #effective() effective settings} decide. */
+	public boolean effectiveJoinNotices() {
+		ModListSettings settings = this.effective();
+		return settings != null && settings.joinNotices();
+	}
+
+	/**
+	 * Returns the profile a connection to {@code connectedAddress} uses: the first matching server profile, else the
+	 * {@linkplain #effective() effective} default profile. Returns {@code null} while the mod is off, so the connection
+	 * is left alone.
+	 */
+	public @Nullable ProfileSettings effectiveProfileFor(final @Nullable String connectedAddress) {
+		ModListSettings settings = this.effective();
+		if (settings == null) {
+			return null;
+		}
+		ServerProfile server = this.serverProfileFor(connectedAddress);
+		return server != null ? server.profile() : settings.defaultProfile();
+	}
+
 	/** Whether chat messages summarize the differences between client and server after joining. */
+	@Override
 	public boolean joinNotices() {
 		return this.settings.joinNotices;
 	}
@@ -78,6 +138,7 @@ public final class ModListConfig {
 	}
 
 	/** The profile used for servers that no server profile matches. */
+	@Override
 	public Profile defaultProfile() {
 		return this.settings.defaultProfile;
 	}
@@ -88,10 +149,13 @@ public final class ModListConfig {
 	}
 
 	/**
-	 * Adds a server profile for {@code address} that starts as a copy of the default profile.
+	 * Adds a server profile for {@code address} that starts as a copy of the default profile that applies: OneConfig's
+	 * in OneConfig mode, otherwise the mod's own.
 	 */
 	public ServerProfile addServerProfile(final String address) {
-		ServerProfile server = new ServerProfile(address.trim(), this.settings.defaultProfile.copy());
+		ModListSettings effective = this.effective();
+		ProfileSettings base = effective != null ? effective.defaultProfile() : this.settings.defaultProfile;
+		ServerProfile server = new ServerProfile(address.trim(), Profile.copyOf(base));
 		server.attach(this::save);
 		this.settings.servers.add(server);
 		this.save();
@@ -102,6 +166,14 @@ public final class ModListConfig {
 		if (this.settings.servers.remove(server)) {
 			this.save();
 		}
+	}
+
+	/**
+	 * Returns the server profile a connection to {@code address} uses, adding one for {@code address} if none matches.
+	 */
+	public ServerProfile serverProfileToEdit(final String address) {
+		ServerProfile server = this.serverProfileFor(address);
+		return server != null ? server : this.addServerProfile(address);
 	}
 
 	/** Returns the first server profile whose address matches, or {@code null} if none does. */
@@ -117,12 +189,6 @@ public final class ModListConfig {
 		return null;
 	}
 
-	/** Returns the profile a connection to {@code connectedAddress} uses. */
-	public Profile profileFor(final @Nullable String connectedAddress) {
-		ServerProfile server = this.serverProfileFor(connectedAddress);
-		return server != null ? server.profile() : this.settings.defaultProfile;
-	}
-
 	private void save() {
 		try {
 			Files.createDirectories(this.path.getParent());
@@ -136,11 +202,15 @@ public final class ModListConfig {
 	 * The serialized form. Field initializers are the defaults, which also apply to keys missing from the file.
 	 */
 	private static final class Settings {
+		private ConfigMode mode = ConfigMode.CUSTOM;
 		private boolean joinNotices = true;
 		private Profile defaultProfile = new Profile();
 		private List<ServerProfile> servers = new ArrayList<>();
 
 		private void normalize() {
+			if (this.mode == null) {
+				this.mode = ConfigMode.CUSTOM;
+			}
 			if (this.defaultProfile == null) {
 				this.defaultProfile = new Profile();
 			}

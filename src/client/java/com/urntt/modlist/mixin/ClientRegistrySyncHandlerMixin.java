@@ -2,7 +2,7 @@ package com.urntt.modlist.mixin;
 
 import com.llamalad7.mixinextras.injector.wrapmethod.WrapMethod;
 import com.llamalad7.mixinextras.injector.wrapoperation.Operation;
-import com.urntt.modlist.config.Profile;
+import com.urntt.modlist.config.ProfileSettings;
 import com.urntt.modlist.registry.Placeholders;
 import com.urntt.modlist.registry.RegistryHoleFiller;
 import com.urntt.modlist.registry.RegistrySyncFilter;
@@ -49,7 +49,7 @@ abstract class ClientRegistrySyncHandlerMixin {
 		}
 		session.addServerRegistryNamespaces(modlist$namespaces(payload));
 
-		Profile profile = session.profile();
+		ProfileSettings profile = session.profile();
 		if (!profile.ignoreUnknownRegistryEntries()) {
 			original.call(payload);
 			return;

@@ -6,7 +6,7 @@ Instructions for AI coding agents working in this repository. `CLAUDE.md` import
 
 `modlist` is a client-side [Fabric](https://fabricmc.net/) mod for Minecraft: Java Edition that lets players edit the mod-related communication between the client and a multiplayer server: what the client reports about its mods (client brand, registered channels), how it reacts to server content it does not have (registry entries), and how it reports mismatches.
 
-[urntt/nojumpdelay](https://github.com/urntt/nojumpdelay) is the reference for the project layout, the configuration screens, the configuration file and the client game tests. Follow its style, but do not add a dependency on it.
+[urntt/nojumpdelay](https://github.com/urntt/nojumpdelay) is the reference for the project layout, the configuration screens, the configuration file and the client game tests, and [urntt/hiteffect](https://github.com/urntt/hiteffect) and [urntt/serverlist](https://github.com/urntt/serverlist) for the configuration mode and the OneConfig integration. Follow their style, but do not add a dependency on nojumpdelay or hiteffect.
 
 ## Project decisions
 
@@ -14,7 +14,7 @@ These decisions are settled. Do not deviate from them without the user's explici
 
 ### Minecraft and toolchain
 
-- Development started on Minecraft 26.3 with Java 25. `gradle.properties` is the single source of truth for the mod, Minecraft, Fabric Loader, Loom, Fabric API, Mod Menu, and Java versions. `build.gradle`, `fabric.mod.json`, the mixin config, and the CI workflows read them from there; do not restate them elsewhere.
+- Development started on Minecraft 26.3 with Java 25. `gradle.properties` is the single source of truth for the mod, Minecraft, Fabric Loader, Loom, Fabric API, Mod Menu, serverlist, OneConfig, and Java versions. `build.gradle`, `fabric.mod.json`, the mixin config, and the CI workflows read them from there; do not restate them elsewhere.
 - Follow the latest official Fabric template ([FabricMC/fabric-example-mod](https://github.com/FabricMC/fabric-example-mod), also available from the [template generator](https://fabricmc.net/develop/template/)): the `net.fabricmc.fabric-loom` Gradle plugin, Mojang's official names with no `mappings` dependency, and `implementation` (not `modImplementation`) for dependencies. Do not use Yarn.
 - Pin `loom_version` to a release version instead of the template's `-SNAPSHOT`, so builds are reproducible.
 - Target only the latest stable (release) Minecraft version. Updates, fixes, and new features are always developed against it. Snapshots, pre-releases, and release candidates are not supported targets.
@@ -42,7 +42,11 @@ The mod version itself follows [Semantic Versioning](https://semver.org/); the `
 
 - Client-only: `fabric.mod.json` declares `"environment": "client"`. There is no server-side component. The mod only changes what the client sends and how it handles what it receives.
 - The mod never changes anything in singleplayer or on a world this client hosts (memory connections). Server list pings are not affected either; only game connections that go through the login phase are.
-- Settings are grouped in profiles. There is one default profile and any number of server profiles, each with an address. A connection uses the first server profile whose address matches (same rules as nojumpdelay: case-insensitive, an address without a port matches any port) and otherwise the default profile. A new server profile starts as a copy of the default profile; profiles do not inherit from each other afterwards. Do not reintroduce whitelist or blacklist modes.
+- Configuration mode, shown as the first button of the main settings screen and stored as `mode` in `modlist.json` (`custom` by default; unknown values become `custom`):
+  - Disabled: the mod changes nothing. No connection gets a session, so nothing is rewritten or ignored, there are no join notices, and Fabric API's disconnect message gets no hint. The settings stay saved but are greyed out.
+  - Custom: the mod's own settings apply.
+  - OneConfig: the join notices and the default profile registered with OneConfig apply; the main screen shows them greyed out with the values OneConfig applies, and the default settings open read-only. Server profiles still come from the mod's own settings, because OneConfig cannot hold a list of profiles, and stay editable. Turning the mod off on its OneConfig card works like Disabled. This mode is only offered when OneConfig is installed. If the configuration file selects it but OneConfig is missing, the mod behaves as in Custom mode and keeps the saved mode until the player changes it.
+- Settings are grouped in profiles. There is one default profile and any number of server profiles, each with an address. A connection uses the first server profile whose address matches (same rules as nojumpdelay: case-insensitive, an address without a port matches any port) and otherwise the default profile. A new server profile starts as a copy of the default profile that applies (OneConfig's in OneConfig mode); profiles do not inherit from each other afterwards. Do not reintroduce whitelist or blacklist modes.
 - A profile's report mode, a single option on the profile screen, decides what the client reports:
   - `actual` ("Unchanged", the default): the real brand and channels.
   - `vanilla` ("Mimic Vanilla"): brand `vanilla`, every namespace hidden, empty channel registrations not sent, all login queries answered as not understood, and outgoing mod payloads dropped.
@@ -54,37 +58,43 @@ The mod version itself follows [Semantic Versioning](https://semver.org/); the `
 - Join notices (enabled by default) are chat messages after joining that list ignored registry entries and the namespaces only one side has. They are informational and never block joining.
 - Translation probing protection (enabled by default, per profile) makes sign editing and anvil renaming treat translation keys and key binding names of the session's hidden namespaces as unknown.
 - A key binding opens the settings screen. It is unbound by default.
+- With serverlist installed, its Add Server and Edit Server Info screens get a "modlist Settings..." button that opens the server profile for the saved address, creating it from the default profile if none matches. It is greyed out while the server has no saved address and while the mod is off.
 
 ### Localization
 
-- All user-facing text, including key binding names, the key binding category, chat messages, and the configuration screens, uses translation keys. Never hard-code display strings.
+- All user-facing text, including key binding names, the key binding category, chat messages, the configuration screens, and the OneConfig option titles, uses translation keys. Never hard-code display strings. Keys shared by the screens and the integrations are constants in `SettingKeys`; OneConfig translates a title, description or option that is a translation key, so its annotations take the keys directly (its deprecated `*Key` attributes are not used).
 - Provide translations for `en_us` and `zh_cn`, and keep both complete whenever a translation key is added or changed.
 
 ### Dependencies
 
 - Required: Fabric Loader and Fabric API.
 - Optional: Mod Menu, declared under `suggests` in `fabric.mod.json`. The mod must load and work normally without it, so Mod Menu classes may only be referenced from the Mod Menu entrypoint.
-- Configuration is hand-written without a config library: a JSON file in the Fabric config directory, serialized with Gson (bundled with Minecraft). The configuration screens use vanilla widgets.
+- Optional: [OneConfig](https://modrinth.com/mod/oneconfig), approved by the user and declared under `suggests`. The build only compiles against its API (`clientCompileOnly`); it is never bundled. OneConfig classes may only be referenced from the `com.urntt.modlist.compat.oneconfig` package, which OneConfig reaches through its `oneconfig:config` entrypoint; the rest of the mod talks to it through `compat.OneConfigBridge`. OneConfig stores its settings in the same config directory as `modlist.json` and watches its files, so its config file must keep a different name (`modlist-oneconfig.json`). Its getters apply the same rules as `Profile` (`ProfileValues`), because OneConfig writes the fields directly.
+- Optional: [serverlist](https://github.com/urntt/serverlist), approved by the user and declared under `suggests`. It is only published as GitHub Releases, so `build.gradle` reads its jar from there through an Ivy repository limited to `com.urntt:serverlist`. The build compiles against its API (`clientCompileOnly`) and loads it in the development client and the tests (`localRuntime`); it is never bundled. serverlist classes may only be referenced from the `com.urntt.modlist.compat.serverlist` package, which serverlist reaches through its `serverlist` entrypoint.
+- The mod's own configuration is hand-written without a config library: a JSON file in the Fabric config directory, serialized with Gson (bundled with Minecraft). The configuration screens use vanilla widgets.
 - Some mixins and classes depend on Fabric API internals (`ClientRegistrySyncHandler`, `RegistrySyncPayload`, `RegistrationPayload`, `CommonRegisterPayload`). Keep that dependency confined to the classes that need it, and expect to revisit them when Fabric API is updated; the client game tests catch breakage.
 - Do not add other dependencies without the user's explicit approval.
 
 ### Implementation
 
 - Language: Java only.
-- Source sets: `src/main` holds only `fabric.mod.json`. All code and client resources live in `src/client`, and the client game tests live in `src/gametest`.
+- Source sets: `src/main` holds only `fabric.mod.json` and the icon. All code and client resources live in `src/client`, and the client game tests live in `src/gametest`.
+- The icon's source is `art/icon.svg`: urntt's hair clip above a list card. `src/main/resources/assets/modlist/icon.png` is rendered from it at 512 x 512 pixels with a transparent background (`rsvg-convert -w 512 -h 512 art/icon.svg -o src/main/resources/assets/modlist/icon.png`); render it again whenever the SVG changes.
 - Mixins: prefer the MixinExtras injectors bundled with Fabric Loader (for example `@ModifyExpressionValue`, `@WrapOperation` and `@WrapMethod`) over `@Redirect` and `@Overwrite`, to stay compatible with other mods and keep porting work small. Name handler methods `modlist$<what>`.
 - Keep the decisions about what to report (`ReportPlan`, `ChannelRewriter`) and what to drop from registry sync (`RegistrySyncFilter`) in plain classes without Minecraft state, so the logic game test can check them directly.
-- Screens: vanilla runs `init()` only the first time a screen instance is shown and merely repositions it afterwards, and `rebuildWidgets()` runs `init()` again into the same `final` layout, which stacks a second copy of every widget. So refresh lists in place, and in `added()` when a screen is shown again; never call `rebuildWidgets()`. Option screens extend `ModListOptionsScreen`: use `section(...)` for titles (vanilla's `addHeader` titles take focus and show a border when clicked) and `refreshOptions()` to rebuild options that depend on another option, deferred to `tick()` when triggered from a click inside the list.
+- Code that acts on a connection reads its profile through `ProfileSettings` (implemented by `Profile` and the OneConfig settings) and asks `ModListConfig` for the settings that apply (`effective()`, `effectiveProfileFor(...)`, `effectiveJoinNotices()`), never for the stored ones directly.
+- Screens: vanilla runs `init()` only the first time a screen instance is shown and merely repositions it afterwards, and `rebuildWidgets()` runs `init()` again into the same `final` layout, which stacks a second copy of every widget. So refresh lists in place, and in `added()` when a screen is shown again; never call `rebuildWidgets()`. Option screens extend `ModListOptionsScreen`: use `section(...)` for titles (vanilla's `addHeader` titles take focus and show a border when clicked), `refreshOptions()` to rebuild options that depend on another option, and `refreshOptionsLater()` when that is triggered from a click inside the list.
 
 ### Testing
 
-- The client game tests in `src/gametest` start Minecraft and check the configuration, the profile selection, the report modes, the channel rewriting, the registry filtering and placeholders, translation probing protection, and the behavior of the configuration screens, including on a local dedicated server that runs in the same JVM. Keep them passing and extend them when behavior changes.
+- The client game tests in `src/gametest` start Minecraft and check the configuration and its modes, the profile selection, the report modes, the channel rewriting, the registry filtering and placeholders, translation probing protection, the behavior of the configuration screens, and the serverlist button, including on a local dedicated server that runs in the same JVM. Keep them passing and extend them when behavior changes.
+- They run twice: without OneConfig, and with `-PoneConfigRuntime=true`, which loads OneConfig and its dependencies (Fabric Language Kotlin, PolyCompose) from Modrinth's Maven into the development client. Their Modrinth version ids live in `gradle.properties` next to `oneconfig_version`; update them together. The tests set OneConfig's fields by reflection, so they compile without it.
 - After porting to a new Minecraft or Fabric API version, run the client game tests. A successful build does not prove that the mixins still have the intended effect.
 - `README.md` describes how to run them, including on a headless machine.
 
 ### CI, releases, and changelog
 
-- GitHub Actions (`.github/workflows/build.yml`) builds the project and runs the client game tests on every push and pull request.
+- GitHub Actions (`.github/workflows/build.yml`) builds the project and runs the client game tests, without and with OneConfig, on every push and pull request.
 - Maintain `CHANGELOG.md` following [Keep a Changelog](https://keepachangelog.com/). Record every user-visible change under `Unreleased` in the same change that introduces it.
 - `.github/workflows/release.yml` builds the mod and publishes a GitHub Release for the project version, with the jar attached and the matching `CHANGELOG.md` section as release notes. It runs when a tag `v<version>` (for example `v1.0.0+26.3`) is pushed, or when started manually on a branch, in which case it creates that tag on the branch's latest commit. It fails if a pushed tag does not match the project version, if the changelog has no section for the version, or if the release already exists.
 - Release only when the user asks. To release, set `mod_version` in `gradle.properties`, rename `Unreleased` in `CHANGELOG.md` to `[<version>] - <YYYY-MM-DD>` above a new empty `Unreleased` section, commit, and push. Then start the release workflow on `main`. Claude Code cloud sessions cannot push tags, so start the workflow through the GitHub Actions API instead.

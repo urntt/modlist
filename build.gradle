@@ -12,6 +12,42 @@ repositories {
 			includeGroup 'com.terraformersmc'
 		}
 	}
+	maven {
+		name = 'Polyfrost'
+		url = 'https://repo.polyfrost.org/releases/'
+		content {
+			includeGroup 'org.polyfrost.oneconfig'
+		}
+	}
+	exclusiveContent {
+		forRepository {
+			maven {
+				name = 'Modrinth'
+				url = 'https://api.modrinth.com/maven'
+			}
+		}
+		filter {
+			includeGroup 'maven.modrinth'
+		}
+	}
+	// serverlist is only published as GitHub Releases, whose tag is "v<version>".
+	exclusiveContent {
+		forRepository {
+			ivy {
+				name = 'serverlist releases'
+				url = 'https://github.com/urntt/serverlist/releases/download/'
+				patternLayout {
+					artifact 'v[revision]/[module]-[revision].[ext]'
+				}
+				metadataSources {
+					artifact()
+				}
+			}
+		}
+		filter {
+			includeModule 'com.urntt', 'serverlist'
+		}
+	}
 }
 
 loom {
@@ -45,6 +81,25 @@ dependencies {
 	// Mod Menu is optional: compile against it, and load it only in the development client.
 	clientCompileOnly "com.terraformersmc:modmenu:${project.modmenu_version}"
 	localRuntime "com.terraformersmc:modmenu:${project.modmenu_version}"
+
+	// serverlist is optional: compile against its API, and load it in the development client and the tests.
+	clientCompileOnly "com.urntt:serverlist:${project.serverlist_version}"
+	localRuntime "com.urntt:serverlist:${project.serverlist_version}"
+
+	// OneConfig is optional: compile against the parts of its API that the integration uses.
+	// Its many transitive dependencies are only needed at runtime, where OneConfig provides them.
+	["config", "config-impl", "ui"].each { module ->
+		clientCompileOnly("org.polyfrost.oneconfig:${module}:${project.oneconfig_version}") {
+			transitive = false
+		}
+	}
+
+	// With -PoneConfigRuntime=true, the development client and the client game tests run with OneConfig installed.
+	if (providers.gradleProperty("oneConfigRuntime").map { it.toBoolean() }.getOrElse(false)) {
+		localRuntime "maven.modrinth:oneconfig:${project.oneconfig_modrinth_id}"
+		localRuntime "maven.modrinth:fabric-language-kotlin:${project.fabric_language_kotlin_modrinth_id}"
+		localRuntime "maven.modrinth:polycompose:${project.polycompose_modrinth_id}"
+	}
 }
 
 def javaVersion = project.java_version as int

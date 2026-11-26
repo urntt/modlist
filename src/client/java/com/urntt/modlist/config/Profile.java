@@ -1,13 +1,9 @@
 package com.urntt.modlist.config;
 
-import com.urntt.modlist.session.ChannelEntries;
 import java.util.ArrayList;
 import java.util.LinkedHashMap;
-import java.util.LinkedHashSet;
 import java.util.List;
 import java.util.Map;
-import java.util.function.Predicate;
-import net.minecraft.resources.Identifier;
 import org.jspecify.annotations.Nullable;
 
 /**
@@ -15,9 +11,10 @@ import org.jspecify.annotations.Nullable;
  * connection uses exactly one of them.
  *
  * <p>Instances are serialized by Gson, so field initializers are the defaults, which also apply to keys missing from
- * the file. Every setter notifies the owning {@link ModListConfig}, which saves the file.
+ * the file, and {@link ProfileValues#DEFAULTS} is an instance that belongs to no configuration. Every setter notifies
+ * the owning {@link ModListConfig}, which saves the file.
  */
-public final class Profile {
+public final class Profile implements ProfileSettings {
 	private boolean ignoreUnknownRegistryEntries = false;
 	/** Placeholder entry per registry, as identifiers. Registries without an entry use the built-in defaults. */
 	private Map<String, String> placeholders = new LinkedHashMap<>();
@@ -36,14 +33,23 @@ public final class Profile {
 
 	/** Returns an independent copy with the same settings and no owner. */
 	public Profile copy() {
+		return copyOf(this);
+	}
+
+	/**
+	 * Returns a profile with the values of {@code settings} and no owner, so changing it saves nothing. Values that a
+	 * profile does not accept are dropped.
+	 */
+	public static Profile copyOf(final ProfileSettings settings) {
 		Profile copy = new Profile();
-		copy.ignoreUnknownRegistryEntries = this.ignoreUnknownRegistryEntries;
-		copy.placeholders = new LinkedHashMap<>(this.placeholders);
-		copy.reportMode = this.reportMode;
-		copy.brand = this.brand;
-		copy.hiddenNamespaces = new ArrayList<>(this.hiddenNamespaces);
-		copy.fakeChannels = new ArrayList<>(this.fakeChannels);
-		copy.protectHiddenTranslations = this.protectHiddenTranslations;
+		copy.ignoreUnknownRegistryEntries = settings.ignoreUnknownRegistryEntries();
+		copy.placeholders = new LinkedHashMap<>(settings.placeholders());
+		copy.reportMode = settings.reportMode();
+		copy.brand = settings.brand();
+		copy.hiddenNamespaces = new ArrayList<>(settings.hiddenNamespaces());
+		copy.fakeChannels = new ArrayList<>(settings.fakeChannels());
+		copy.protectHiddenTranslations = settings.protectHiddenTranslations();
+		copy.normalize();
 		return copy;
 	}
 
@@ -51,6 +57,7 @@ public final class Profile {
 		this.onChange = onChange;
 	}
 
+	@Override
 	public boolean ignoreUnknownRegistryEntries() {
 		return this.ignoreUnknownRegistryEntries;
 	}
@@ -60,7 +67,7 @@ public final class Profile {
 		this.changed();
 	}
 
-	/** Placeholder overrides, from registry identifier to entry identifier. */
+	@Override
 	public Map<String, String> placeholders() {
 		return Map.copyOf(this.placeholders);
 	}
@@ -71,6 +78,7 @@ public final class Profile {
 		this.changed();
 	}
 
+	@Override
 	public ReportMode reportMode() {
 		return this.reportMode;
 	}
@@ -80,16 +88,18 @@ public final class Profile {
 		this.changed();
 	}
 
+	@Override
 	public String brand() {
 		return this.brand;
 	}
 
 	/** Sets the brand reported in {@link ReportMode#CUSTOM} mode. */
 	public void setBrand(final String brand) {
-		this.brand = brand.trim();
+		this.brand = ProfileValues.brand(brand);
 		this.changed();
 	}
 
+	@Override
 	public List<String> hiddenNamespaces() {
 		return List.copyOf(this.hiddenNamespaces);
 	}
@@ -101,6 +111,7 @@ public final class Profile {
 		this.changed();
 	}
 
+	@Override
 	public List<String> fakeChannels() {
 		return List.copyOf(this.fakeChannels);
 	}
@@ -112,6 +123,7 @@ public final class Profile {
 		this.changed();
 	}
 
+	@Override
 	public boolean protectHiddenTranslations() {
 		return this.protectHiddenTranslations;
 	}
@@ -135,32 +147,9 @@ public final class Profile {
 		if (this.reportMode == null) {
 			this.reportMode = ReportMode.ACTUAL;
 		}
-		this.brand = this.brand == null ? "" : this.brand.trim();
-		this.hiddenNamespaces = clean(this.hiddenNamespaces, ChannelEntries::isHideable);
-		this.fakeChannels = clean(this.fakeChannels, ChannelEntries::isValidFakeEntry);
-
-		Map<String, String> cleaned = new LinkedHashMap<>();
-		if (this.placeholders != null) {
-			this.placeholders.forEach((registry, entry) -> {
-				if (registry != null && entry != null && Identifier.tryParse(registry.trim()) != null
-						&& Identifier.tryParse(entry.trim()) != null) {
-					cleaned.put(registry.trim(), entry.trim());
-				}
-			});
-		}
-		this.placeholders = cleaned;
-	}
-
-	private static List<String> clean(final @Nullable List<String> entries,
-			final Predicate<String> valid) {
-		LinkedHashSet<String> result = new LinkedHashSet<>();
-		if (entries != null) {
-			for (String entry : entries) {
-				if (entry != null && valid.test(entry.trim())) {
-					result.add(entry.trim());
-				}
-			}
-		}
-		return new ArrayList<>(result);
+		this.brand = ProfileValues.brand(this.brand);
+		this.hiddenNamespaces = ProfileValues.hiddenNamespaces(this.hiddenNamespaces);
+		this.fakeChannels = ProfileValues.fakeChannels(this.fakeChannels);
+		this.placeholders = ProfileValues.placeholders(this.placeholders);
 	}
 }

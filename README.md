@@ -5,7 +5,8 @@ A client-side Fabric mod for Minecraft: Java Edition that lets you edit the mod-
 - Join servers whose mods do not match yours, and see in chat what differs.
 - Join servers that send blocks, items or other registry entries your client does not have, shown as placeholders you choose. This is off by default.
 - Choose what the server learns about your mods: the client brand, which mods are hidden, and which mods are faked. One click mimics a vanilla client, mimics the server's mod set, or restores your real mods.
-- Use different settings for each server.
+- Use different settings for each server, also reachable from the Edit Server screen with [serverlist](https://github.com/urntt/serverlist).
+- Turn the mod off with one button, or manage its settings in [OneConfig](https://modrinth.com/mod/oneconfig).
 
 ## Risks
 
@@ -29,13 +30,29 @@ A client-side Fabric mod for Minecraft: Java Edition that lets you edit the mod-
 2. Download the jar from this repository's [Releases](https://github.com/urntt/modlist/releases) page. Each release supports a single Minecraft version, shown after the `+` in its version number. For example, `1.0.0+26.3` is for Minecraft 26.3.
 3. Put the jar into your `.minecraft/mods` folder.
 
-[Mod Menu](https://modrinth.com/mod/modmenu) is optional. When installed, it opens the mod's settings from its mod list.
+These mods are optional:
+
+- [Mod Menu](https://modrinth.com/mod/modmenu) opens the mod's settings from its mod list.
+- [OneConfig](https://modrinth.com/mod/oneconfig) can hold the general and default settings; see [Mode](#mode).
+- [serverlist](https://github.com/urntt/serverlist) adds a **modlist Settings...** button to the Add Server and Edit Server Info screens.
 
 ## Usage
 
 Out of the box the mod changes nothing about what your client sends. It only shows join notices and records a report about each server.
 
-Open the settings with the **Open modlist Settings** key binding in **Options → Controls → Key Binds** (unbound by default), or from Mod Menu. All settings are saved to `config/modlist.json` as soon as you change them.
+Open the settings with the **Open modlist Settings** key binding in **Options → Controls → Key Binds** (unbound by default), or from Mod Menu or OneConfig. All settings are saved to `config/modlist.json` as soon as you change them.
+
+### Mode
+
+The first button of the settings screen chooses where the settings come from:
+
+| Mode | Meaning |
+| --- | --- |
+| Disabled | The mod changes nothing: servers see your real brand and mods, servers with content your client lacks disconnect you as usual, and there are no join notices. Your settings are kept, greyed out. |
+| Custom (default) | The settings on the mod's own screens apply. |
+| OneConfig | The join notices and default settings set in OneConfig apply. The mod's screen shows them greyed out, and **Open in OneConfig...** opens them in OneConfig. Server settings still come from the mod's own screens, which OneConfig's **Server Settings** button also opens. The toggle on the mod's OneConfig card turns the mod off like Disabled. Only offered while OneConfig is installed. |
+
+If `config/modlist.json` selects OneConfig but OneConfig is not installed, the custom settings apply until it is installed again. OneConfig keeps its values in `config/modlist-oneconfig.json`.
 
 ### How servers see your mods
 
@@ -56,11 +73,11 @@ After you join a server, chat lists, when there are any:
 - the mods the server has and your client does not;
 - your mods the server announced no channels for. The server only announces the channels it receives on, so this also lists mods that only receive data from the server.
 
-These are informational; differences never block joining. Turn them off with **Join Notices** on the main settings screen.
+These are informational; differences never block joining. Turn them off with **Join Notices** on the main settings screen, or in OneConfig in OneConfig mode.
 
 ### Settings profiles
 
-All connection settings belong to a profile. The **Default Settings** apply to every server without its own settings. **Server Settings** lists per-server profiles: type an address and press **Add** to add one as a copy of the default settings, then **Edit** it. Each matches by the address you connect to, ignoring case. An address without a port, such as `mc.example.com`, matches the server on any port; with a port, such as `mc.example.com:25566`, only that port. The first matching profile is used, and profiles that never match because an earlier one matches first are shown in red.
+All connection settings belong to a profile. The **Default Settings** apply to every server without its own settings. **Server Settings** lists per-server profiles: type an address and press **Add** to add one as a copy of the default settings that apply, then **Edit** it. With serverlist installed, **modlist Settings...** on the Edit Server Info screen opens the profile of that server's saved address, adding it if none matches. Each matches by the address you connect to, ignoring case. An address without a port, such as `mc.example.com`, matches the server on any port; with a port, such as `mc.example.com:25566`, only that port. The first matching profile is used, and profiles that never match because an earlier one matches first are shown in red.
 
 The **Server Report** shows the last server's address, which settings were used, the server's brand and channels by namespace, the channels hidden and faked, and the registry entries ignored. **Edit Settings for This Server** opens or creates that server's profile.
 
@@ -118,6 +135,18 @@ xvfb-run -a -s "-screen 0 1920x1080x24" ./gradlew runClientGameTest
 ```
 
 Screenshots taken by the tests are saved to `build/run/clientGameTest/screenshots/`.
+
+The development client and the tests load serverlist. To load OneConfig as well, which offers the OneConfig mode and runs the tests that need it, add `-PoneConfigRuntime=true`:
+
+```bash
+./gradlew runClientGameTest -PoneConfigRuntime=true
+```
+
+The icon is rendered from `art/icon.svg`:
+
+```bash
+rsvg-convert -w 512 -h 512 art/icon.svg -o src/main/resources/assets/modlist/icon.png
+```
 
 The multiplayer tests start a local dedicated server in the same JVM, so the test setup in `build.gradle` accepts the [Minecraft EULA](https://aka.ms/MinecraftEULA) for that test server.
 

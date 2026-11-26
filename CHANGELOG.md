@@ -6,6 +6,13 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 
 ## [Unreleased]
 
+### Added
+
+- Add a mode button at the top of the settings screen: Disabled turns the mod off without losing the settings, Custom uses the mod's own settings, and OneConfig uses the settings set in OneConfig.
+- Add optional OneConfig support: the join notices and the default settings can be edited in OneConfig, which also opens the server settings. Server settings still apply in OneConfig mode, and new ones start as a copy of OneConfig's default settings.
+- Add a "modlist Settings..." button to serverlist's Add Server and Edit Server Info screens that opens the server's settings.
+- Add a mod icon.
+
 ## [1.0.1+26.3] - 2026-11-17
 
 ### Changed

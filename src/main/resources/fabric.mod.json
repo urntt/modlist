@@ -13,6 +13,7 @@
 		"issues": "https://github.com/urntt/modlist/issues"
 	},
 	"license": "MIT",
+	"icon": "assets/modlist/icon.png",
 	"environment": "client",
 	"entrypoints": {
 		"client": [
@@ -20,6 +21,12 @@
 		],
 		"modmenu": [
 			"com.urntt.modlist.compat.ModMenuIntegration"
+		],
+		"oneconfig:config": [
+			"com.urntt.modlist.compat.oneconfig.OneConfigIntegration"
+		],
+		"serverlist": [
+			"com.urntt.modlist.compat.serverlist.ServerListIntegration"
 		]
 	},
 	"mixins": [
@@ -35,6 +42,8 @@
 		"fabric-api": ">=${fabric_api_version}"
 	},
 	"suggests": {
-		"modmenu": "*"
+		"modmenu": "*",
+		"oneconfig": "*",
+		"serverlist": "*"
 	}
 }

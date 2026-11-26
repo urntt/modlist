@@ -1,7 +1,6 @@
 package com.urntt.modlist.config;
 
 import com.google.gson.annotations.SerializedName;
-import com.mojang.serialization.Codec;
 import net.minecraft.network.chat.Component;
 import net.minecraft.util.StringRepresentable;
 
@@ -23,8 +22,6 @@ public enum ReportMode implements StringRepresentable {
 	@SerializedName("custom")
 	CUSTOM("custom");
 
-	public static final Codec<ReportMode> CODEC = StringRepresentable.fromEnum(ReportMode::values);
-
 	private final String name;
 
 	ReportMode(final String name) {
@@ -37,10 +34,10 @@ public enum ReportMode implements StringRepresentable {
 	}
 
 	public Component label() {
-		return Component.translatable("options.modlist.report_mode." + this.name);
+		return Component.translatable(SettingKeys.REPORT_MODE_PREFIX + this.name);
 	}
 
 	public Component description() {
-		return Component.translatable("options.modlist.report_mode." + this.name + ".description");
+		return Component.translatable(SettingKeys.REPORT_MODE_PREFIX + this.name + SettingKeys.DESCRIPTION);
 	}
 }

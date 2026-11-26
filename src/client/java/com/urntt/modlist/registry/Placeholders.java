@@ -24,11 +24,18 @@ public final class Placeholders {
 	public static final List<ResourceKey<? extends Registry<?>>> EDITABLE = List.of(
 			Registries.BLOCK, Registries.ITEM, Registries.ENTITY_TYPE);
 
+	/** The built-in block placeholder: air, which is invisible and has no collision. */
+	public static final String DEFAULT_BLOCK = "minecraft:air";
+	/** The built-in item placeholder: air, so unknown items look like empty slots. */
+	public static final String DEFAULT_ITEM = "minecraft:air";
+	/** The built-in entity type placeholder: the marker, which is invisible and has no hitbox. */
+	public static final String DEFAULT_ENTITY_TYPE = "minecraft:marker";
+
 	/** Built-in placeholders, keyed by registry. */
 	public static final Map<Identifier, Identifier> BUILT_IN = Map.of(
-			Registries.BLOCK.identifier(), Identifier.withDefaultNamespace("air"),
-			Registries.ITEM.identifier(), Identifier.withDefaultNamespace("air"),
-			Registries.ENTITY_TYPE.identifier(), Identifier.withDefaultNamespace("marker"));
+			Registries.BLOCK.identifier(), Identifier.parse(DEFAULT_BLOCK),
+			Registries.ITEM.identifier(), Identifier.parse(DEFAULT_ITEM),
+			Registries.ENTITY_TYPE.identifier(), Identifier.parse(DEFAULT_ENTITY_TYPE));
 
 	private Placeholders() {
 	}

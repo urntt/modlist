@@ -54,7 +54,8 @@ public final class ServerReportScreen extends Screen {
 		Button edit = footer.addChild(Button.builder(Component.translatable("options.modlist.report.edit"),
 				button -> this.editServerProfile(session)).width(200).build());
 		edit.setTooltip(Tooltip.create(Component.translatable("options.modlist.report.edit.tooltip")));
-		edit.active = session != null && session.address() != null && ServerAddresses.isValid(session.address());
+		edit.active = this.config.isActive() && session != null && session.address() != null
+				&& ServerAddresses.isValid(session.address());
 		footer.addChild(Button.builder(CommonComponents.GUI_DONE, button -> this.onClose()).width(100).build());
 
 		this.layout.visitWidgets(this::addRenderableWidget);
@@ -84,10 +85,7 @@ public final class ServerReportScreen extends Screen {
 		if (session == null || session.address() == null || !ServerAddresses.isValid(session.address())) {
 			return;
 		}
-		ServerProfile server = this.config.serverProfileFor(session.address());
-		if (server == null) {
-			server = this.config.addServerProfile(session.address());
-		}
+		ServerProfile server = this.config.serverProfileToEdit(session.address());
 		this.minecraft.gui.setScreen(new ProfileScreen(this, server.profile(), server));
 	}
 }

@@ -1,7 +1,7 @@
 package com.urntt.modlist.session;
 
 import com.urntt.modlist.config.ModListConfig;
-import com.urntt.modlist.config.ServerProfile;
+import com.urntt.modlist.config.ProfileSettings;
 import com.urntt.modlist.registry.UnknownContentFallbacks;
 import net.minecraft.client.multiplayer.ServerData;
 import net.minecraft.network.Connection;
@@ -11,8 +11,8 @@ import org.jspecify.annotations.Nullable;
  * Tracks the client's game connection to a server. There is at most one at a time.
  *
  * <p>A session starts when the login to a server begins and ends when the connection is lost. Connections to a
- * world this client hosts (memory connections) and server list pings never get a session, so the mod leaves them
- * alone.
+ * world this client hosts (memory connections), server list pings and every connection while the mod is off never get
+ * a session, so the mod leaves them alone.
  */
 public final class SessionManager {
 	private static volatile @Nullable ConnectionSession current;
@@ -22,7 +22,8 @@ public final class SessionManager {
 	}
 
 	/**
-	 * Starts a session for a login to {@code serverData} over {@code connection}, unless it is a memory connection.
+	 * Starts a session for a login to {@code serverData} over {@code connection}, unless it is a memory connection or
+	 * the mod is off.
 	 */
 	public static void begin(final Connection connection, final @Nullable ServerData serverData,
 			final ModListConfig config) {
@@ -31,9 +32,12 @@ public final class SessionManager {
 			return;
 		}
 		String address = serverData != null ? serverData.ip : null;
-		ServerProfile serverProfile = config.serverProfileFor(address);
-		ConnectionSession session = new ConnectionSession(connection, address,
-				serverProfile != null ? serverProfile.profile() : config.defaultProfile(), serverProfile != null);
+		ProfileSettings profile = config.effectiveProfileFor(address);
+		if (profile == null) {
+			return;
+		}
+		ConnectionSession session = new ConnectionSession(connection, address, profile,
+				config.serverProfileFor(address) != null);
 		current = session;
 		last = session;
 	}

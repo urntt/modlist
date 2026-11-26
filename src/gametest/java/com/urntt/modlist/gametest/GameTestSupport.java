@@ -1,10 +1,14 @@
 package com.urntt.modlist.gametest;
 
 import com.urntt.modlist.ModListClient;
+import com.urntt.modlist.compat.OneConfigBridge;
+import com.urntt.modlist.config.ConfigMode;
 import com.urntt.modlist.config.ModListConfig;
+import com.urntt.modlist.config.ModListSettings;
 import com.urntt.modlist.config.Profile;
 import com.urntt.modlist.config.ReportMode;
 import com.urntt.modlist.config.ServerProfile;
+import java.util.ArrayList;
 import java.util.List;
 import java.util.Map;
 import java.util.Objects;
@@ -29,9 +33,14 @@ final class GameTestSupport {
 		context.runOnClient(client -> change.accept(ModListClient.config()));
 	}
 
-	/** Restores the default profile's defaults and removes every server profile. */
+	/**
+	 * Restores custom mode and the default profile's defaults, removes every server profile, and restores OneConfig's
+	 * defaults if it is installed.
+	 */
 	static void resetConfig(final ClientGameTestContext context) {
 		configure(context, config -> {
+			config.setMode(ConfigMode.CUSTOM);
+			resetOneConfig();
 			config.setJoinNotices(true);
 			for (ServerProfile server : config.serverProfiles()) {
 				config.removeServerProfile(server);
@@ -49,6 +58,42 @@ final class GameTestSupport {
 		profile.setIgnoreUnknownRegistryEntries(false);
 		profile.setPlaceholders(Map.of());
 		profile.setProtectHiddenTranslations(true);
+	}
+
+	/** The settings OneConfig holds, if it is installed. */
+	static ModListSettings oneConfig() {
+		return OneConfigBridge.settings().orElseThrow(() -> new AssertionError("OneConfig should be installed"));
+	}
+
+	/**
+	 * Sets a field of the settings OneConfig holds, as OneConfig's screen would. The tests use reflection so that they
+	 * compile without OneConfig.
+	 */
+	static void setOneConfig(final String field, final Object value) {
+		ModListSettings settings = oneConfig();
+		try {
+			settings.getClass().getField(field).set(settings, value);
+		} catch (ReflectiveOperationException e) {
+			throw new AssertionError("cannot set OneConfig field " + field, e);
+		}
+	}
+
+	/** Restores the defaults of the settings OneConfig holds, if it is installed. */
+	static void resetOneConfig() {
+		if (!OneConfigBridge.isAvailable()) {
+			return;
+		}
+		setOneConfig("enabled", true);
+		setOneConfig("joinNotices", true);
+		setOneConfig("ignoreUnknownRegistryEntries", false);
+		setOneConfig("blockPlaceholder", "");
+		setOneConfig("itemPlaceholder", "");
+		setOneConfig("entityTypePlaceholder", "");
+		setOneConfig("reportMode", ReportMode.ACTUAL.ordinal());
+		setOneConfig("brand", "");
+		setOneConfig("hiddenNamespaces", new ArrayList<String>());
+		setOneConfig("fakeChannels", new ArrayList<String>());
+		setOneConfig("protectHiddenTranslations", true);
 	}
 
 	static void switchLanguage(final ClientGameTestContext context, final String language) {

@@ -53,7 +53,7 @@ public final class ModListClient implements ClientModInitializer {
 
 		ClientPlayConnectionEvents.JOIN.register((handler, sender, client) -> {
 			ConnectionSession session = SessionManager.of(handler.getConnection());
-			if (session != null && config.joinNotices() && session.claimJoinNotices()) {
+			if (session != null && config.effectiveJoinNotices() && session.claimJoinNotices()) {
 				JoinNotices.show(session, client, installedMods());
 			}
 		});

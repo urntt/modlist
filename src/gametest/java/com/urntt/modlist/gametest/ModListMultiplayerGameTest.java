@@ -5,9 +5,13 @@ import static com.urntt.modlist.gametest.GameTestSupport.check;
 import static com.urntt.modlist.gametest.GameTestSupport.checkEquals;
 import static com.urntt.modlist.gametest.GameTestSupport.configure;
 import static com.urntt.modlist.gametest.GameTestSupport.resetConfig;
+import static com.urntt.modlist.gametest.GameTestSupport.resetOneConfig;
 import static com.urntt.modlist.gametest.GameTestSupport.resetProfile;
+import static com.urntt.modlist.gametest.GameTestSupport.setOneConfig;
 
 import com.urntt.modlist.ModListClient;
+import com.urntt.modlist.compat.OneConfigBridge;
+import com.urntt.modlist.config.ConfigMode;
 import com.urntt.modlist.config.ModListConfigScreen;
 import com.urntt.modlist.config.Profile;
 import com.urntt.modlist.config.ReportMode;
@@ -54,7 +58,8 @@ import net.minecraft.world.level.block.entity.SignTextSlot;
 
 /**
  * Connects to a local dedicated server, which runs in the same JVM, and checks on the server's side what the client
- * reports in each report mode, and on the client's side how it handles registry entries it does not have.
+ * reports in each report mode and configuration mode, and on the client's side how it handles registry entries it
+ * does not have.
  */
 @SuppressWarnings("UnstableApiUsage")
 public final class ModListMultiplayerGameTest implements FabricClientGameTest {
@@ -74,6 +79,10 @@ public final class ModListMultiplayerGameTest implements FabricClientGameTest {
 			checkMimicVanilla(context, server);
 			checkMimicServer(context, server);
 			checkRefusedWithHint(context, server);
+			checkDisabled(context, server);
+			if (OneConfigBridge.isAvailable()) {
+				checkOneConfigMode(context, server);
+			}
 		}
 		GhostEntries.setEnabled(false);
 		resetConfig(context);
@@ -210,6 +219,98 @@ public final class ModListMultiplayerGameTest implements FabricClientGameTest {
 	/** Without ignoring unknown registry entries, Fabric API refuses the server, and the reason mentions the option. */
 	private static void checkRefusedWithHint(final ClientGameTestContext context, final TestDedicatedServerContext server) {
 		configure(context, config -> resetProfile(config.defaultProfile()));
+		String reason = refusalReason(context, server, "modlist-refused-with-hint");
+		check(reason.contains(ignoreHint(context)), "the disconnect reason should mention the option to ignore unknown entries");
+		LOGGER.info("Refusal hint checked");
+	}
+
+	/**
+	 * In disabled mode nothing changes, even for a server with a profile that changes everything: the server sees the
+	 * real brand and channels, and a server with unknown registry entries is refused without a hint.
+	 */
+	private static void checkDisabled(final ClientGameTestContext context, final TestDedicatedServerContext server) {
+		configure(context, config -> {
+			config.setMode(ConfigMode.DISABLED);
+			Profile profile = config.addServerProfile(ADDRESS).profile();
+			profile.setIgnoreUnknownRegistryEntries(true);
+			profile.setReportMode(ReportMode.CUSTOM);
+			profile.setBrand(CUSTOM_BRAND);
+			profile.setHiddenNamespaces(List.of(TestPayloads.NAMESPACE));
+			profile.setFakeChannels(List.of(FAKE_HANDSHAKE.toString()));
+		});
+		ServerRecorder.reset();
+		try (TestDedicatedServerConnection connection = server.connect()) {
+			connection.waitForChunksRender();
+			checkEquals("fabric", ServerRecorder.brand(), "brand the server received in disabled mode");
+			check(canSend(server, TestPayloads.ClientChannel.TYPE.id()), "the real channel should be reported in disabled mode");
+			check(!canSend(server, FAKE_HANDSHAKE), "nothing should be faked in disabled mode");
+			check(context.computeOnClient(client -> SessionManager.current() == null), "disabled mode should start no session");
+			checkProbe(context, 1, "in disabled mode");
+		}
+		context.waitFor(client -> client.getConnection() == null);
+		server.waitFor(s -> s.getPlayerList().getPlayers().isEmpty());
+
+		String reason = refusalReason(context, server, "modlist-refused-disabled");
+		check(!reason.contains(ignoreHint(context)), "the disconnect reason should not mention modlist in disabled mode");
+		configure(context, config -> {
+			config.serverProfiles().forEach(config::removeServerProfile);
+			config.setMode(ConfigMode.CUSTOM);
+		});
+		LOGGER.info("Disabled mode checked");
+	}
+
+	/**
+	 * Only runs with OneConfig installed. In OneConfig mode, OneConfig's settings replace the default profile, server
+	 * profiles still apply, and the toggle on OneConfig's card turns the mod off.
+	 */
+	private static void checkOneConfigMode(final ClientGameTestContext context, final TestDedicatedServerContext server) {
+		configure(context, config -> {
+			config.setMode(ConfigMode.ONECONFIG);
+			resetProfile(config.defaultProfile());
+			setOneConfig("reportMode", ReportMode.CUSTOM.ordinal());
+			setOneConfig("brand", "oneconfigbrand");
+		});
+		try {
+			checkEquals("oneconfigbrand", brandReceived(context, server), "brand from OneConfig's default profile");
+
+			configure(context, config -> {
+				Profile profile = config.addServerProfile(ADDRESS).profile();
+				profile.setReportMode(ReportMode.CUSTOM);
+				profile.setBrand(CUSTOM_BRAND);
+			});
+			checkEquals(CUSTOM_BRAND, brandReceived(context, server), "brand from a server profile in OneConfig mode");
+
+			configure(context, config -> setOneConfig("enabled", false));
+			checkEquals("fabric", brandReceived(context, server), "brand while OneConfig's card toggle is off");
+		} finally {
+			configure(context, config -> {
+				resetOneConfig();
+				config.serverProfiles().forEach(config::removeServerProfile);
+				config.setMode(ConfigMode.CUSTOM);
+			});
+		}
+		LOGGER.info("OneConfig mode checked");
+	}
+
+	/** Joins the server and returns the brand it received. */
+	private static String brandReceived(final ClientGameTestContext context, final TestDedicatedServerContext server) {
+		ServerRecorder.reset();
+		String brand;
+		try (TestDedicatedServerConnection connection = server.connect()) {
+			connection.waitForChunksRender();
+			brand = ServerRecorder.brand();
+		}
+		context.waitFor(client -> client.getConnection() == null);
+		server.waitFor(s -> s.getPlayerList().getPlayers().isEmpty());
+		return brand;
+	}
+
+	/**
+	 * Connects while the server sends registry entries the client does not have, waits until the client is refused,
+	 * and returns the disconnect reason.
+	 */
+	private static String refusalReason(final ClientGameTestContext context, final TestDedicatedServerContext server,
+			final String screenshot) {
 		GhostEntries.setEnabled(true);
 		int port = server.computeOnServer(MinecraftServer::getPort);
 		context.runOnClient(client -> ConnectScreen.startConnecting(new TitleScreen(), client,
@@ -218,15 +319,17 @@ public final class ModListMultiplayerGameTest implements FabricClientGameTest {
 		context.waitForScreen(DisconnectedScreen.class);
 		String reason = context.computeOnClient(client ->
 				((DisconnectedScreenAccessor) Objects.requireNonNull(client.gui.screen())).modlistGametest$details().reason().getString());
-		LOGGER.info("Disconnect reason without ignoring: {}", reason.replace('\n', ' '));
-		String hint = context.computeOnClient(client -> Component.translatable("message.modlist.ignore_hint").getString());
-		check(reason.contains(hint), "the disconnect reason should mention the option to ignore unknown entries");
+		LOGGER.info("Disconnect reason ({}): {}", screenshot, reason.replace('\n', ' '));
 		context.getInput().setCursorPos(0, 0);
-		context.takeScreenshot("modlist-refused-with-hint");
+		context.takeScreenshot(screenshot);
 		context.setScreen(() -> null);
 		GhostEntries.setEnabled(false);
 		server.waitFor(s -> s.getPlayerList().getPlayers().isEmpty());
-		LOGGER.info("Refusal hint checked");
+		return reason;
+	}
+
+	private static String ignoreHint(final ClientGameTestContext context) {
+		return context.computeOnClient(client -> Component.translatable("message.modlist.ignore_hint").getString());
 	}
 
 	/** Sends a probe payload and waits until the server has handled {@code expected} of them. */
