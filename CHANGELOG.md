@@ -6,6 +6,8 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 
 ## [Unreleased]
 
+## [1.1.0+26.3] - 2026-11-27
+
 ### Added
 
 - Add a mode button at the top of the settings screen: Disabled turns the mod off without losing the settings, Custom uses the mod's own settings, and OneConfig uses the settings set in OneConfig.
